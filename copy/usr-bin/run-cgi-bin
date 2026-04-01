@@ -1,0 +1,13 @@
+#!/bin/sh
+# DEBUG=1
+# PATH=$PATH:$PWD
+# set -- /Users/sampersand/code/rpi/copy/home/webserver/r49
+# QUERY_STRING='code=print(123*456)'
+PATH=$PATH:$HOME/sampshell/bin/posix
+
+# : ${TMPDIR:=/tmp/}
+test $DEBUG && set -x
+
+. extract-query-params "$@"
+
+exec "$@"

@@ -1,0 +1,16 @@
+#!/bin/sh
+
+p_sh "$QUERY_STRING"
+read bar
+printf '<!DOCTYPE html>\n'
+printf '<html lang="en">\n'
+printf '<head><title>Hello world!</title></head>\n'
+printf '<body>\n'
+printf '<div><h1>This is an example:' "$x" $bar'</h1>\n'
+printf '<p>This domain is for use in documentation examples without needing permission. Avoid use in operations.</p>\n'
+printf '</div><p>\n'
+xx -c "${amnt:?}" "${msg:?}"
+printf '</body></html>\n'
+printf 'oops' >&2
+IFS='&'
+# exit 100

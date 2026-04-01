@@ -1,0 +1,4 @@
+#!/bin/sh
+
+p $METHOD
+ruby -ne 'p $_'

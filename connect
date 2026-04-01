@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# download sshpass so we can ssh in with a password lol
+readonly pi_username=sampersand
+readonly pi_host=samperpi.local
+readonly pi_password=`security find-generic-password -a $pi_username -s $pi_host -w`
+
+sshpass -p "$pi_password" ssh "$pi_username@$pi_host"

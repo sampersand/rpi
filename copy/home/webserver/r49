@@ -1,0 +1,34 @@
+#!/bin/sh
+
+test $DEBUG && set -x
+set -e
+
+if test $METHOD = POST; then
+	header Content-Type text/plain
+	ruby -ne 'p $_'
+	r49 -e "${code:?}" 2>&1 && echo
+	return
+fi
+
+if test $METHOD != GET; then
+	header Content-Type text/plain
+	echo 'bad method'
+	return 1
+fi
+
+cat <<EOS
+<!DOCTYPE html>
+<html>
+<body>
+  <form method="POST">
+    <label for="code">Code:</label><br>
+    <textarea id="code" name="code" rows="5" cols="40"></textarea><br><br>
+
+    <input type="checkbox" id="include_stderr" name="include_stderr" value="true">
+    <label for="include_stderr">Include stderr</label><br><br>
+
+    <input type="submit" value="Submit">
+  </form>
+</body>
+</html>
+EOS

@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# download sshpass so we can ssh in with a password lol
+if ! brew list sshpass >/dev/null 2>&1; then
+	echo == installing shpass ==
+	brew install sshpass
+fi
+
+readonly pi_username=sampersand
+readonly pi_host=samperpi.local
+readonly pi_password=`security find-generic-password -a $pi_username -s $pi_host -w`
+
+alias sp='sshpass -p "$pi_password"'
+
+echo == copying files over ==
+sp scp -r ./copy/home/. $pi_host:~/
+sp scp -r ./copy/home/webserver.c $pi_host:~/webserver.c
+sp scp -r ./copy/usr-bin/. $pi_host:/tmp/bin
+sp ssh "$pi_host" "sudo mv /tmp/bin/* /usr/bin"
+
+echo == running initial startup script ==
+sp ssh "$pi_host" 'sh ~/pi-initial-setup.sh'
+sp ssh "$pi_host" 'pkill webserver && ~/bin/webserver 2>&1'
+

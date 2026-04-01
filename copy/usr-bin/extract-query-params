@@ -1,0 +1,30 @@
+#!/bin/echo this file must be sourced
+
+test $DEBUG && set -x
+
+_OLD_IFS=$IFS _OLD_ARGS=`set +o`
+IFS='&'
+set +f
+export QUERY_PARAMS=''
+
+for query in $QUERY_STRING
+do
+	var_name_raw=${query%%=*}
+	var_name=`printf %s "$var_name_raw" | tr A-Z- a-z_`
+	case $var_name in
+		*[!a-z0-9_]*) printf "bad variable name: %s\n" "$var_name" >&2; exit 2
+	esac
+
+	value_raw=${query#"$var_name_raw"}
+	test $value_raw || continue
+	value_raw="${value_raw#=}"
+
+	value=$(printf '%b' "$(printf '%s' "$value_raw" | sed 's/+/ /g; s/%/\\x/g')")
+
+	export $var_name="$value"
+	QUERY_PARAMS=$QUERY_STRING:$var_name
+done
+
+eval $_OLD_ARGS
+IFS=$_OLD_IFS
+unset _OLD_ARGS _OLD_IFS
