@@ -1,0 +1,78 @@
+#!/usr/bin/env -S r49 -s
+
+%PORT = ($port || 8080).to_i
+%CGI_BIN = $cgi_bin || $ENV['CGI_BIN'] || "/usr/bin/run-cgi-bin"
+%RUN_ONCE = $o || $run_once
+
+def p(x)
+  printf($stderr, "%s\n", x._inspect); $stderr.flush
+end
+
+unless File.x(%CGI_BIN)
+  $stderr.print("CGI bin path, ", %CGI_BIN, " is not executable. Exiting")
+  exit(2)
+end
+
+def handle_request(conn)
+  # Headers are on another FD
+  headers = open('|cat', 'w+')
+
+  # Execute the `%CGI_BIN` executable (which performs routing and stuff), where:
+  # - stdin is the inbound request body
+  # - stdout is the outbound response body
+  # - fd #9 is the headers (so they can be output separately from stdout)
+  p (headers.fileno)
+  cmd = sprintf("%s < /dev/fd/%d 9>>/dev/fd/%d", %CGI_BIN, conn.fileno, headers.fileno)
+  p(cmd)
+  body = system2(cmd)
+
+  # If failure, ignore all headers, and print a generic message
+  if $? != 0 then
+    conn.print("HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 22\r\n\r\nInternal Server Error\n")
+    return
+  end
+
+  headers_data = headers.read
+  headers.close
+  # ^^^ TODO: Figure out how to close write to headers, and not read
+
+  # Print headers (which includes http status)
+  conn.print(headers_data)
+
+  # If there's a body, print it
+  unless body == ''
+    conn.printf("Content-Length: %d\r\n\r\n%s", body.length, body)
+  end
+end
+
+server = TCPserver.open(%PORT)
+print("Starting to listen for connections on ", %PORT, "\n")
+
+protect
+  while %TRUE
+    protect
+      conn = select([server])[0][0].accept
+
+      #if (pid = fork() == nil) then
+        protect
+          p("spot1")
+          handle_request(conn)
+          p("spot2")
+          conn.close
+          p("spot3")
+        ensure
+          #_exit(0)
+        end
+      #end
+
+      #waitpid(pid, 0)
+    ensure
+      #conn.close
+    end
+
+    %RUN_ONCE && break
+  end
+ensure
+  print("Shutting down!")
+  server.close
+end

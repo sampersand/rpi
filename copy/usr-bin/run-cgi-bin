@@ -1,13 +1,61 @@
-#!/bin/sh
-# DEBUG=1
-# PATH=$PATH:$PWD
-# set -- /Users/sampersand/code/rpi/copy/home/webserver/r49
-# QUERY_STRING='code=print(123*456)'
+#!/bin/dash
+
 PATH=$PATH:$HOME/sampshell/bin/posix
+PATH=$PATH:$HOME/code/rpi/copy/usr-bin/
 
-# : ${TMPDIR:=/tmp/}
-test $DEBUG && set -x
+set -euC
+test ${DEBUG-} && set -x
 
-. extract-query-params "$@"
+readonly WebServerRoot=$HOME/code/rpi/copy/home/webserver/
+if ! test -d $WebServerRoot; then echo "WebServerRoot does not exist: $WebServerRoot" >&2; exit 2; fi
+Cr="`printf '\r.'`"; Cr="${Cr%.}"; readonly Cr
 
-exec "$@"
+# Parse the very first line
+{
+	read METHOD RawRequest _Rest
+	# p "$METHOD" "$RawRequest" "$_Rest" >&2
+	export METHOD
+	export REQUEST_PATH="${RawRequest%%\?*}"
+	case $REQUEST_PATH in
+		*\?*)
+		QUERY_STRING=${RawRequest#"$REQUEST_PATH"\?}
+		p "$RawRequest" "$REQUEST_PATH" "$QUERY_STRING" >&2
+		. extract-query-params
+	esac
+}
+
+printf "GOT $METHOD $REQUEST_PATH\n" >&2
+
+. extract-headers
+
+# deal with the `Content-Length` header
+if test -n "${HEADER_Content_Length-}"; then
+	RequestBody=`head -c $HEADER_Content_Length && printf .`
+	RequestBody=${RequestBody%.}
+	export RequestBodyExtracted=$(printf '%b' "`printf '%s' "$RequestBody" | sed 's/+/ /g; s/%/\\x/g'`")
+fi
+
+# p "RequestBody=${RequestBody-}" >&2
+
+Executable=$WebServerRoot/$REQUEST_PATH
+if test ! -x $Executable; then
+	printf 'HTTP/1.1 404 Not Found\r\n' >&9
+	printf 'Content-Type: text/plain\r\n' >&9
+	printf "404 Not Found: $Executable\r\n"
+	exit 0
+fi
+
+
+set +e
+printf "%s" "${RequestBody-}" | "$Executable"
+exit=$?
+set -e
+case $exit in
+	38)
+		:;; # user already wrote their own exit codes. (38 is `&` lol)
+	0)
+		status 200 ;;
+	*)
+		status 400
+		header Content-Type text/plain ;;
+esac

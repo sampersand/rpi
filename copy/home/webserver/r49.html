@@ -1,5 +1,20 @@
-#!/bin/sh
+#!/usr/bin/env r49
 
+$ENV['DEBUG'] != '' && $DEBUG = %TRUE
+
+if $ENV['METHOD'] == 'POST' then
+  print($stdin.read._inspect)
+  exit()
+end
+
+
+if test $METHOD != GET; then
+  status 405 true
+  exit 38
+fi
+
+
+__END__
 test $DEBUG && set -x
 
 if test $METHOD = POST; then
@@ -12,10 +27,6 @@ if test $METHOD = POST; then
 	exit 0
 fi
 
-if test $METHOD != GET; then
-	status 405 true
-	exit 38
-fi
 
 status 200
 header Content-Type text/html

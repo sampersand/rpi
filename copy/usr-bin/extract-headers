@@ -1,0 +1,15 @@
+#!sh
+
+# Extract headers out
+export HEADERS=
+while read Line; do
+	Line=${Line%"$Cr"}
+	test -z "$Line" && break # we've reached the end
+
+	HeaderName=${Line%%:*}
+	HeaderValue=${Line#"$HeaderName":}
+	HeaderValue=${HeaderValue##[[:blank:]]}
+	HeaderName=HEADER_`printf "%s" $HeaderName | tr - _ | tr -d '[[:blank:]]'`
+	HEADERS=${HEADERS}${HEADERS:+:}$HeaderName
+	export $HeaderName="$HeaderValue"
+done

@@ -5,4 +5,4 @@ if test $# -ne 2; then
 	exit 2
 fi
 
-printf '\1%s: %s\n' "$1" "$2" >&9
+printf '%s: %s\n' "$1" "$2" >&9
