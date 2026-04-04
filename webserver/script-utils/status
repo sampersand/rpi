@@ -1,0 +1,88 @@
+#!/bin/sh
+
+if test $# -lt 1 || case $1 in *[!0-9]*) true;; *) false; esac; then
+	cat <<EOS >&2
+usage: $0 code [...]
+
+if more than just a code is given, additional args are body.
+If there is exactly oen additional arg and it is 'true', then just the
+msg string is output
+EOS
+	exit 2
+fi
+
+# Get the message corresponding to the code
+case $1 in
+  100) msg="Continue" ;;
+  101) msg="Switching Protocols" ;;
+  102) msg="Processing" ;;
+  103) msg="Early Hints" ;;
+  200) msg="OK" ;;
+  201) msg="Created" ;;
+  202) msg="Accepted" ;;
+  203) msg="Non-Authoritative Information" ;;
+  204) msg="No Content" ;;
+  205) msg="Reset Content" ;;
+  206) msg="Partial Content" ;;
+  207) msg="Multi-Status" ;;
+  208) msg="Already Reported" ;;
+  226) msg="IM Used" ;;
+  300) msg="Multiple Choices" ;;
+  301) msg="Moved Permanently" ;;
+  302) msg="Found" ;;
+  303) msg="See Other" ;;
+  304) msg="Not Modified" ;;
+  307) msg="Temporary Redirect" ;;
+  308) msg="Permanent Redirect" ;;
+  400) msg="Bad Request" ;;
+  401) msg="Unauthorized" ;;
+  402) msg="Payment Required" ;;
+  403) msg="Forbidden" ;;
+  404) msg="Not Found" ;;
+  405) msg="Method Not Allowed" ;;
+  406) msg="Not Acceptable" ;;
+  407) msg="Proxy Authentication Required" ;;
+  408) msg="Request Timeout" ;;
+  409) msg="Conflict" ;;
+  410) msg="Gone" ;;
+  411) msg="Length Required" ;;
+  412) msg="Precondition Failed" ;;
+  413) msg="Content Too Large" ;;
+  414) msg="URI Too Long" ;;
+  415) msg="Unsupported Media Type" ;;
+  416) msg="Range Not Satisfiable" ;;
+  417) msg="Expectation Failed" ;;
+  418) msg="I'm a Teapot" ;;
+  421) msg="Misdirected Request" ;;
+  422) msg="Unprocessable Content" ;;
+  423) msg="Locked" ;;
+  424) msg="Failed Dependency" ;;
+  425) msg="Too Early" ;;
+  426) msg="Upgrade Required" ;;
+  428) msg="Precondition Required" ;;
+  429) msg="Too Many Requests" ;;
+  431) msg="Request Header Fields Too Large" ;;
+  451) msg="Unavailable For Legal Reasons" ;;
+  500) msg="Internal Server Error" ;;
+  501) msg="Not Implemented" ;;
+  502) msg="Bad Gateway" ;;
+  503) msg="Service Unavailable" ;;
+  504) msg="Gateway Timeout" ;;
+  505) msg="HTTP Version Not Supported" ;;
+  506) msg="Variant Also Negotiates" ;;
+  507) msg="Insufficient Storage" ;;
+  508) msg="Loop Detected" ;;
+  510) msg="Not Extended" ;;
+  511) msg="Network Authentication Required" ;;
+  *)   echo unknown status code: $1 >&2; exit 2 ;;
+esac
+
+printf "HTTP/1.1 $1 $msg\r\n" >&9
+shift
+
+if test $# -eq 1 && test $1 = true; then
+  header Content-Type text/plain
+  echo $msg
+elif test $# -ne 0; then
+  echo $*
+fi

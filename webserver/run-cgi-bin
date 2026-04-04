@@ -1,0 +1,68 @@
+#!/bin/dash
+
+set -euC
+test ${DEBUG-} && set -x
+
+readonly WebServerRoot=$PWD
+if ! test -d $WebServerRoot; then echo "WebServerRoot does not exist: $WebServerRoot" >&2; exit 2; fi
+
+PATH=$WebServerRoot/script-utils:$PATH
+PATH=$PWD/../old/copy/usr-bin:$PATH
+
+Cr="`printf '\r.'`"; Cr="${Cr%.}"; readonly Cr
+
+# Parse the very first line
+{
+	read METHOD RawRequest _Rest
+	# p "$METHOD" "$RawRequest" "$_Rest" >&2
+	export METHOD
+	export REQUEST_PATH="${RawRequest%%\?*}"
+	case $REQUEST_PATH in
+		*\?*)
+		QUERY_STRING=${RawRequest#"$REQUEST_PATH"\?}
+		p "$RawRequest" "$REQUEST_PATH" "$QUERY_STRING" >&2
+		. extract-query-params
+	esac
+}
+
+printf "GOT $METHOD $REQUEST_PATH\n" >&2
+
+. extract-headers
+
+# deal with the `Content-Length` header
+if test -n "${HEADER_Content_Length-}"; then
+	RequestBody=`head -c $HEADER_Content_Length && printf .`
+	RequestBody=${RequestBody%.}
+	export RequestBodyExtracted=$(printf '%b' "`printf '%s' "$RequestBody" | sed 's/+/ /g; s/%/\\x/g'`")
+fi
+
+# p "RequestBody=${RequestBody-}" >&2
+
+Executable=$WebServerRoot/serve/${REQUEST_PATH#/}
+if test -d $Executable; then Executable=${Executable%/}/_index; fi # set index for default path
+
+if test ! -x $Executable; then
+	if test -f $Executable; then
+		warn got non-executable serve file: $Executable
+	fi
+
+	printf 'HTTP/1.1 404 Not Found\r\n' >&9
+	printf 'Content-Type: text/plain\r\n' >&9
+	printf "404 Not Found: $Executable\r\n"
+	exit 0
+fi
+
+
+set +e
+printf "%s" "${RequestBody-}" | "$Executable"
+exit=$?
+set -e
+case $exit in
+	38)
+		:;; # user already wrote their own exit codes. (38 is `&` lol)
+	0)
+		status 200 ;;
+	*)
+		status 400
+		header Content-Type text/plain ;;
+esac
