@@ -1,0 +1,122 @@
+#!/usr/bin/env -S r49 -s
+
+################################################################################
+#                               Helper Functions                               #
+################################################################################
+
+# Debugging code
+def p(x) printf($stderr, "%s\n", x._inspect); $stderr.flush end
+
+# Exit prematurely
+def abort(fmt, *args)
+  printf($stderr, "%s: " + fmt + "\n", *args)
+  exit(2)
+end
+
+# Read a file file and return it
+def File.read(path)
+  f = open(path, 'r')
+  protect
+    f.read
+  ensure
+    f.close
+  end
+end
+
+################################################################################
+#                              Handle CLI Options                              #
+################################################################################
+
+if $h || $help then
+  printf("usage: %s [-port=8080] [-cgi_bin=$CGI_BIN] [-o/-run_once] [-tmpdir=$TMPDIR, '/tmp']\n", $0)
+  exit(0)
+end
+
+%PORT = ($port || 8080).to_i
+%CGI_BIN = $cgi_bin || $ENV['CGI_BIN'] || "/usr/bin/run-cgi-bin"
+%RUN_ONCE = $o || $run_once
+%TEMPDIR = ($tmpdir || $ENV['TEMPDIR'] || '/tmp') + '/webserver'
+
+
+################################################################################
+#                             Validate CLI Options                             #
+################################################################################
+
+# Make sure tempdir doesn't have weird characters and is absolute
+if %TEMPDIR =~ /[^\/a-zA-Z0-9.]/ || %TEMPDIR[0] !~ ?/ then
+  abort("Bad tempdir %s (must be absolute and only have [A-Za-z0-9.])", %TEMPDIR)
+end
+
+# Make sure the cgi-bin (ie the program that handles the dispatching) is executable
+unless File.x(%CGI_BIN)
+  abort("CGI bin path %s is not executable", %CGI_BIN)
+end
+
+# If the tempdir doesn't exist, try to make it. If we can't, abort.
+unless File.d(%TEMPDIR)
+  if system("mkdir -p " + %TEMPDIR) != 0 then
+    abort("Couldn't make tempdir: %s", %TEMPDIR)
+  end
+end
+
+# Execute the `%CGI_BIN` executable (which performs routing and stuff), where:
+# - stdin is the inbound request body
+# - stdout is the outbound response body
+# - fd #8 is outbound status
+# - fd #9 is outbound headers
+def handle_request(conn)
+  tmpdir = system2(sprintf("mktemp -d %s/XXXXXXXXXXXX", %TEMPDIR)).chop
+  headers_file = tmpdir + '/headers'
+  status_file = tmpdir + '/status'
+  protect
+    cmd = sprintf("%s < /dev/fd/%d 9>%s 8>%s", %CGI_BIN, conn.fileno, headers_file, status_file)
+    body = system2(cmd)
+
+    # If failure, ignore all headers, and print a generic message
+    if $? != 0 then
+      conn.print("HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 22\r\n\r\nInternal Server Error\n")
+      return
+    end
+
+    printf(conn, '%s', File.read(status_file))
+    printf(conn, '%s', File.read(headers_file))
+
+    # If there's a body, print it
+    unless body == ''
+      printf(conn, "Content-Length: %d\r\n\r\n%s", body.length, body)
+    end
+
+    conn.flush
+  ensure
+    File.unlink(headers_file, status_file)
+    Dir.unlink(tmpdir)
+  end
+end
+
+server = TCPserver.open(%PORT)
+print("Starting to listen for connections on ", %PORT, "\n")
+
+protect
+  while %TRUE
+    conn = select([server])[0][0].accept
+
+    if (pid = fork() == nil) then
+      protect
+        handle_request(conn)
+      ensure
+        protect
+          conn.close
+        ensure
+          _exit(0)
+        end
+      end
+    end
+
+    waitpid(pid, 0)
+
+    %RUN_ONCE && break
+  end
+ensure
+  print("Shutting down!")
+  server.close
+end

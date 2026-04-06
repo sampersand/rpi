@@ -7,7 +7,7 @@ readonly WebServerRoot=$PWD
 if ! test -d $WebServerRoot; then echo "WebServerRoot does not exist: $WebServerRoot" >&2; exit 2; fi
 
 PATH=$WebServerRoot/script-utils:$PATH
-PATH=$PWD/../old/copy/usr-bin:$PATH
+PATH=$PATH:$PWD/../old/copy/usr-bin
 
 Cr="`printf '\r.'`"; Cr="${Cr%.}"; readonly Cr
 
