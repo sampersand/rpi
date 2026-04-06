@@ -20,10 +20,10 @@ do
 	ParamValue="${ParamValue#=}"
 
 	ParamValue=`printf '%s' "$ParamValue" | sed 's/+/ /g; s/%/\\\\x/g'`
-	ParamValue=`printf '%b' "$ParamValue" | sed "s/'/'\"'\"'/"`
+	ParamValue=`printf '%b' "$ParamValue" | sed "s/'/'\"'\"'/g"`
 
 	printf "%s='%s'\n" $ParamName "$ParamValue"
 	QUERY_PARAMS=$QUERY_PARAMS${QUERY_PARAMS:+:}$ParamName
 done
 
-echo QUERY_PARAMS=$QUERY_PARAMS
+echo QUERY_PARAMS=\'$QUERY_PARAMS\'

@@ -1,54 +1,48 @@
-#!/bin/sh
+#!/usr/bin/env r49
 
-test $DEBUG && set -x
+$ENV['DEBUG'] && $DEBUG = 1
+$METHOD = $ENV['METHOD']
 
-set -euC
-if test $METHOD = POST; then
-  QUERY_STRING=$(cat)
-  Kw=`extract-url-encoding "$QUERY_STRING"`
-  set -a
-  eval "$Kw"
-  set +a
-fi
+if $METHOD == 'POST' then
+  kw = system2('extract-url-encoding "$(cat)"')
+  $? != 0 && exit(1)
+  kw.gsub(/^[a-zA-Z0-9_]+=/, '$\0')
+  kw.gsub(/'"'"'/, '\x27')
+  kw.gsub(/"/, '\x22')
+  kw.tr("'", '"')
+  eval(kw)
+end
 
-if test $METHOD != GET && test $METHOD != POST; then
-	status 405 true
-	exit
-fi
+if $METHOD != 'POST' && $METHOD != 'GET' then
+  system('status 405 true')
+  exit()
+end
 
-status 200
-header Content-Type text/html
-cat <<HTML
+system('status 200')
+system('header Content-Type text/html')
+
+print('
 <!DOCTYPE html>
 <html>
 <body>
   <form method="POST">
     <label for="code">Code:</label><br>
-    <textarea id="code" name="code" rows="5" cols="40">${code-}</textarea><br><br>
+    <textarea id="code" name="code" rows="5" cols="40">' + $code + '</textarea><br><br>
 
     <input type="checkbox" id="include_stderr" name="include_stderr" value="true">
     <label for="include_stderr">Include stderr</label><br><br>
 
     <input type="submit" value="Submit">
-  </form>
-HTML
+  </form>')
 
-if test $METHOD == POST; then
-  echo '<pre><code>'
+if $METHOD == 'POST' then
+  print("<pre><code>\n")
 
-  set +e
-  echo '--response--'
-  r49 -e "${code:?}" 2>&1
-  exit=$?
-  set -e
-  echo '--exit code--'
-  echo $exit
-  test $exit -ne 0 && echo "exit status: $exit"
-  exit 0
-  echo '</code></pre>'
-fi
+  print("--response--\n")
+  setenv('_code', $code)
+  system('r49 2>&1 -e "$_code"')
+  printf("\n--exit code--\n%d\n", $?)
+  print("</code></pre>\n")
+end
 
-cat <<HTML
-  </body>
-</html>
-HTML
+print("  </body>\n<html>")
