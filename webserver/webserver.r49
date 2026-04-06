@@ -84,7 +84,11 @@ def handle_request(conn)
 
   protect
     cmd = sprintf("%s < /dev/fd/%d", %CGI_BIN, conn.fileno)
+    #cmd = sprintf("%s < %s", %CGI_BIN, body_file)
+    %DEBUG && printf($stderr, "Running: %s\n", cmd)
     body = system2(cmd)
+    printf("pid: %d\n", $$)
+    sleep(1000)
 
     # If failure, ignore all headers, and print a generic message
     if $? != 0 then
@@ -141,6 +145,6 @@ protect
     %RUN_ONCE && break
   end
 ensure
-  print("Shutting down!")
+  print("Shutting down!\n")
   server.close
 end

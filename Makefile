@@ -20,10 +20,10 @@ connect:
 deploy: copy-files initial-startup
 copy-files:
 	@echo "== copying files over =="
-	@$(SP) scp -r ./copy/home/. $(PI_HOST):~/
-	@$(SP) scp -r ./copy/home/webserver.c $(PI_HOST):~/webserver.c
-	@$(SP) scp -r ./copy/usr-bin/. $(PI_HOST):/tmp/bin
-	@$(SP) ssh "$(PI_HOST)" "sudo mv /tmp/bin/* /usr/bin"
+	@$(SP) scp -r ./webserver $(PI_HOST):~/
+	@$(SP) scp -r ./pi-initial-setup.sh $(PI_HOST):~/
+	@# $(SP) scp -r ./copy/usr-bin/. $(PI_HOST):/tmp/bin
+	@# $(SP) ssh "$(PI_HOST)" "sudo mv /tmp/bin/* /usr/bin"
 
 initial-startup:
 	@echo "== running initial startup script =="

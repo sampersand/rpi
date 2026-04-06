@@ -4,7 +4,7 @@ test ${DEBUG-} && set -x
 IFS='&'
 set +f
 
-QUERY_PARAMS=
+PARAMS=
 for RawParameterString in $*
 do
 	RawParamName=${RawParameterString%%=*}
@@ -23,7 +23,7 @@ do
 	ParamValue=`printf '%b' "$ParamValue" | sed "s/'/'\"'\"'/g"`
 
 	printf "%s='%s'\n" $ParamName "$ParamValue"
-	QUERY_PARAMS=$QUERY_PARAMS${QUERY_PARAMS:+:}$ParamName
+	PARAMS=$PARAMS${PARAMS:+:}$ParamName
 done
 
-echo QUERY_PARAMS=\'$QUERY_PARAMS\'
+echo PARAMS=\'$PARAMS\'

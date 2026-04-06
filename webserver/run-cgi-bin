@@ -4,7 +4,10 @@ set -euC
 test ${DEBUG-} && set -x
 
 readonly WebServerRoot=$PWD
-if ! test -d $WebServerRoot; then echo "WebServerRoot does not exist: $WebServerRoot" >&2; exit 2; fi
+if ! test -d $WebServerRoot; then
+	echo "WebServerRoot does not exist: $WebServerRoot" >&2
+	exit 2
+fi
 
 PATH=$WebServerRoot/script-utils:$PATH
 PATH=$PATH:$PWD/../old/copy/usr-bin
