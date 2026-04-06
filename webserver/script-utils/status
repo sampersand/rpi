@@ -79,7 +79,7 @@ case $1 in
   *)   echo unknown status code: $1 >&2; exit 2 ;;
 esac
 
-printf "HTTP/1.1 $1 $msg\r\n" >&8
+printf "HTTP/1.1 $1 $msg\r\n" >> "$STATUS_FILE"
 shift
 
 if test $# -eq 1 && test $1 = true; then

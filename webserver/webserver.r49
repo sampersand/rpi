@@ -14,6 +14,10 @@ def abort(fmt, *args)
 end
 
 # Read a file file and return it
+def File.touch(path)
+  open(path, 'a').close
+end
+
 def File.read(path)
   f = open(path, 'r')
   protect
@@ -28,10 +32,11 @@ end
 ################################################################################
 
 if $h || $help then
-  printf("usage: %s [-port=8080] [-cgi_bin=$CGI_BIN] [-o/-run_once] [-tmpdir=$TMPDIR, '/tmp']\n", $0)
+  printf("usage: %s [-d,-debug] [-port=8080] [-cgi_bin=$CGI_BIN] [-o/-run_once] [-tmpdir=$TMPDIR, '/tmp']\n", $0)
   exit(0)
 end
 
+%DEBUG = $d || $debug
 %PORT = ($port || 8080).to_i
 %CGI_BIN = $cgi_bin || $ENV['CGI_BIN'] || "/usr/bin/run-cgi-bin"
 %RUN_ONCE = $o || $run_once
@@ -41,6 +46,9 @@ end
 ################################################################################
 #                             Validate CLI Options                             #
 ################################################################################
+if %DEBUG
+  setenv('DEBUG', '1')
+end
 
 # Make sure tempdir doesn't have weird characters and is absolute
 if %TEMPDIR =~ /[^\/a-zA-Z0-9.]/ || %TEMPDIR[0] !~ ?/ then
@@ -68,8 +76,14 @@ def handle_request(conn)
   tmpdir = system2(sprintf("mktemp -d %s/XXXXXXXXXXXX", %TEMPDIR)).chop
   headers_file = tmpdir + '/headers'
   status_file = tmpdir + '/status'
+  setenv('STATUS_FILE', status_file)
+  setenv('HEADERS_FILE', headers_file)
+
+  File.touch(headers_file)
+  File.touch(status_file)
+
   protect
-    cmd = sprintf("%s < /dev/fd/%d 9>%s 8>%s", %CGI_BIN, conn.fileno, headers_file, status_file)
+    cmd = sprintf("%s < /dev/fd/%d", %CGI_BIN, conn.fileno)
     body = system2(cmd)
 
     # If failure, ignore all headers, and print a generic message
@@ -78,8 +92,15 @@ def handle_request(conn)
       return
     end
 
-    printf(conn, '%s', File.read(status_file))
-    printf(conn, '%s', File.read(headers_file))
+    status = File.read(status_file)
+    headers = File.read(headers_file)
+
+    if %DEBUG then
+      printf($stderr, "status: %s\nheaders: %s\nbody: %s\n", status._inspect, headers._inspect, body._inspect)
+    end
+
+    printf(conn, '%s', status)
+    printf(conn, '%s', headers)
 
     # If there's a body, print it
     unless body == ''
@@ -100,19 +121,22 @@ protect
   while %TRUE
     conn = select([server])[0][0].accept
 
-    if (pid = fork() == nil) then
-      protect
-        handle_request(conn)
-      ensure
+    protect
+      if (pid = fork() == nil) then
         protect
-          conn.close
+          handle_request(conn)
         ensure
-          _exit(0)
+          protect
+            conn.close
+          ensure
+            _exit(0)
+          end
         end
       end
+      waitpid(pid, 0)
+    ensure
+      conn.close
     end
-
-    waitpid(pid, 0)
 
     %RUN_ONCE && break
   end

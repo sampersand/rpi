@@ -1,0 +1,29 @@
+#!/bin/sh
+
+test ${DEBUG-} && set -x
+IFS='&'
+set +f
+
+QUERY_PARAMS=
+for RawParameterString in $*
+do
+	RawParamName=${RawParameterString%%=*}
+	ParamName=`printf %s "$RawParamName" | tr A-Z- a-z_`
+	case $ParamName in
+		*[!a-z0-9_]*)
+			printf 'Bad Parameter Name: %s\n' "$ParamName" >&2
+			exit 2
+	esac
+
+	ParamValue=${RawParameterString#"$RawParamName"}
+	test $ParamValue || continue # if it doesnt exist continue
+	ParamValue="${ParamValue#=}"
+
+	ParamValue=`printf '%s' "$ParamValue" | sed 's/+/ /g; s/%/\\\\x/g'`
+	ParamValue=`printf '%b' "$ParamValue" | sed "s/'/'\"'\"'/"`
+
+	printf "%s='%s'\n" $ParamName "$ParamValue"
+	QUERY_PARAMS=$QUERY_PARAMS${QUERY_PARAMS:+:}$ParamName
+done
+
+echo QUERY_PARAMS=$QUERY_PARAMS

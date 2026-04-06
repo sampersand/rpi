@@ -1,0 +1,14 @@
+#!/usr/bin/env r49
+
+if $ENV['METHOD'] != 'POST' then
+  system('status 405 true')
+  exit(38)
+end
+
+protect
+  eval($stdin.read)
+resque
+  printf("eval error: %s", $!)
+  system("status 400")
+end
+

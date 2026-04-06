@@ -1,17 +1,18 @@
 #!/bin/sh
 
-status 200
 header Content-Type text/html
+
+: ${place:=world} # you can add a place in the query params
 
 cat <<EOS
 <!DOCTYPE html>
 <html lang=en>
 <head>
-	<title>Hello world!</title>
+	<title>Hello $place!</title>
 </head>
 <body>
-	<h1>Hello, world!</h1>
-	<p>The time on the server is currently `date`</p>
+	<h1>Hello, $place!</h1>
+	<p>The time on the server is currently `date`.</p>
 </body>
 </html>
 EOS

@@ -14,14 +14,14 @@ Cr="`printf '\r.'`"; Cr="${Cr%.}"; readonly Cr
 # Parse the very first line
 {
 	read METHOD RawRequest _Rest
-	# p "$METHOD" "$RawRequest" "$_Rest" >&2
 	export METHOD
 	export REQUEST_PATH="${RawRequest%%\?*}"
-	case $REQUEST_PATH in
-		*\?*)
-		QUERY_STRING=${RawRequest#"$REQUEST_PATH"\?}
-		p "$RawRequest" "$REQUEST_PATH" "$QUERY_STRING" >&2
-		. extract-query-params
+	case $RawRequest in *\?*)
+		export QUERY_STRING=${RawRequest#"$REQUEST_PATH"\?}
+		QueryPath=`extract-url-encoding "$QUERY_STRING"`
+		set -ax
+		eval "$QueryPath"
+		set +ax
 	esac
 }
 
@@ -46,9 +46,9 @@ if test ! -x $Executable; then
 		warn got non-executable serve file: $Executable
 	fi
 
-	printf 'HTTP/1.1 404 Not Found\r\n' >&9
-	printf 'Content-Type: text/plain\r\n' >&9
-	printf "404 Not Found: $Executable\r\n"
+	status 404
+	header Content-Type text/plain
+	echo "404 Not Found: $REQUEST_PATH"
 	exit 0
 fi
 
@@ -57,12 +57,15 @@ set +e
 printf "%s" "${RequestBody-}" | "$Executable"
 exit=$?
 set -e
-case $exit in
-	38)
-		:;; # user already wrote their own exit codes. (38 is `&` lol)
-	0)
-		status 200 ;;
-	*)
-		status 400
-		header Content-Type text/plain ;;
-esac
+
+# If status file already has something, just use that
+if test -s "$STATUS_FILE"; then
+	: # do nothing
+elif test $exit -eq 0; then
+	# if exit code is `0`, then that's success
+	status 200
+else
+	# Exit status is 400, user error.
+	status 400
+	header Content-Type text/plain
+fi
