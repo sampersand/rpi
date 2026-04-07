@@ -21,8 +21,7 @@ end
 system('status 200')
 system('header Content-Type text/html')
 
-print('
-<!DOCTYPE html>
+print('<!DOCTYPE html>
 <html>
 <body>
   <form method="POST">

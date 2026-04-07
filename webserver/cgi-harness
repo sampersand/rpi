@@ -1,1 +1,24 @@
 #!/bin/dash
+
+test ${DEBUG-} && set -x
+set -euC
+Harness_Dir=`mktemp -d "${TMPDIR:=/tmp}"/XXXXXXXXXXXX`
+readonly Harness_Dir
+
+status=$Harness_Dir/status
+headers=$Harness_Dir/headers
+
+trap 'rm "$status" "$headers"; rmdir "$Harness_Dir"' EXIT
+
+touch $status
+touch $headers
+
+export STATUS_FILE=$status
+export HEADERS_FILE=$headers
+
+body=`./run-cgi-bin`
+
+cat $status $headers
+if test ${#body} -ne 0; then
+	printf 'Content-Length: %d\r\n\r\n%s' ${#body} "$body"
+fi

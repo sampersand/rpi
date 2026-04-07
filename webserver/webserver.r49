@@ -32,13 +32,14 @@ end
 ################################################################################
 
 if $h || $help then
-  printf("usage: %s [-d,-debug] [-port=8080] [-cgi_bin=$CGI_BIN] [-o/-run_once] [-tmpdir=$TMPDIR, '/tmp']\n", $0)
+  printf("usage: %s [-d,-debug,-v,-verbose] [-port=8080] [-cgi_bin=$CGI_BIN] [-o/-run_once] [-tmpdir=$TMPDIR, '/tmp']\n", $0)
   exit(0)
 end
 
 %DEBUG = $d || $debug
+%VERBOSE = $v || $verbose
 %PORT = ($port || 8080).to_i
-%CGI_BIN = $cgi_bin || $ENV['CGI_BIN'] || "/usr/bin/run-cgi-bin"
+%CGI_BIN = $cgi_bin || $ENV['CGI_BIN'] || $ENV['PWD']+'/run-cgi-bin'
 %RUN_ONCE = $o || $run_once
 %TEMPDIR = ($tmpdir || $ENV['TEMPDIR'] || '/tmp') + '/webserver'
 
@@ -83,12 +84,9 @@ def handle_request(conn)
   File.touch(status_file)
 
   protect
-    cmd = sprintf("%s < /dev/fd/%d", %CGI_BIN, conn.fileno)
-    #cmd = sprintf("%s < %s", %CGI_BIN, body_file)
-    %DEBUG && printf($stderr, "Running: %s\n", cmd)
+    cmd = sprintf("%s <&%d", %CGI_BIN, conn.fileno)
+    %VERBOSE && printf($stderr, "Running: %s\n", cmd)
     body = system2(cmd)
-    printf("pid: %d\n", $$)
-    sleep(1000)
 
     # If failure, ignore all headers, and print a generic message
     if $? != 0 then
@@ -99,7 +97,7 @@ def handle_request(conn)
     status = File.read(status_file)
     headers = File.read(headers_file)
 
-    if %DEBUG then
+    if %VERBOSE then
       printf($stderr, "status: %s\nheaders: %s\nbody: %s\n", status._inspect, headers._inspect, body._inspect)
     end
 
@@ -118,6 +116,20 @@ def handle_request(conn)
   end
 end
 
+def handle_request2(conn)
+  cmd = sprintf("%s <&%d", %CGI_BIN, conn.fileno)
+  %DEBUG && printf($stderr, "Running: %s\n", cmd)
+  body = system2(cmd)
+
+  # If failure, ignore all headers, and print a generic message
+  if $? != 0 then
+    printf(conn, "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 22\r\n\r\nInternal Server Error\n")
+    return
+  end
+
+  printf(conn, '%s', body)
+end
+
 server = TCPserver.open(%PORT)
 print("Starting to listen for connections on ", %PORT, "\n")
 
@@ -126,7 +138,7 @@ protect
     conn = select([server])[0][0].accept
 
     protect
-      if (pid = fork() == nil) then
+      if ((pid = fork()) == nil) then
         protect
           handle_request(conn)
         ensure
@@ -137,7 +149,7 @@ protect
           end
         end
       end
-      waitpid(pid, 0)
+
     ensure
       conn.close
     end
@@ -148,3 +160,4 @@ ensure
   print("Shutting down!\n")
   server.close
 end
+

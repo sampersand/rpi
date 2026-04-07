@@ -1,0 +1,19 @@
+#!/usr/bin/env r49
+def p(x) printf($stderr, "%s\n", x._inspect) end
+
+%PORT = ($ARGV[0] || 1234).to_i
+server = TCPserver.open(%PORT)
+
+protect
+  conn = select([server])[0][0].accept
+
+  if (pid = fork()) == nil then
+    system(sprintf("cat -v <&%d", conn.fileno))
+    _exit(0)
+  end
+
+  sleep(5)
+  conn.close
+ensure
+  server.close
+end
