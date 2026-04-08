@@ -18,6 +18,11 @@ Cr="`printf '\r.'`"; Cr="${Cr%.}"; readonly Cr
 # Parse the very first line
 {
 	read METHOD RawRequest _Rest
+	case $METHOD in *[![A-Z]]*)
+		status 501 'HTTPS not supported'
+		exit
+	esac
+
 	export METHOD
 	export REQUEST_PATH="${RawRequest%%\?*}"
 	case $RawRequest in *\?*)

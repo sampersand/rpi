@@ -1,9 +1,7 @@
 #!/usr/bin/env r49
 
 
-$ENV['DEBUG'] && $DEBUG = 1
-$METHOD = $ENV['METHOD']
-
+load('extract-globals.r49')
 
 if $METHOD == 'POST' then
   load('extract-url-encoding.r49')

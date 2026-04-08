@@ -1,0 +1,4 @@
+#!r49
+
+$ENV['DEBUG'] && $DEBUG = 1
+$METHOD = $ENV['METHOD']
