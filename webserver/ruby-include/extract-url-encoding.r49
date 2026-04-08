@@ -1,0 +1,14 @@
+#!r49
+
+kw = system2('extract-url-encoding "$(cat)"')
+if $? != 0 then
+   printf($stderr, "couldnt extract url encoding\n")
+   exit(1)
+end
+
+kw.gsub(/^[a-zA-Z0-9_]+=/, '$\0')
+kw.gsub(/'"'"'/, '\x27')
+kw.gsub(/"/, '\x22')
+kw.tr("'", '"')
+
+eval(kw)

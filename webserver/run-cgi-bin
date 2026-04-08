@@ -9,6 +9,7 @@ if ! test -d $WebServerRoot; then
 	exit 2
 fi
 
+export RUBYLIB=$RUBYLIB${RUBYLIB:+:}$WebServerRoot/ruby-include
 PATH=$WebServerRoot/script-utils:$PATH
 PATH=$PATH:$PWD/../old/copy/usr-bin
 
