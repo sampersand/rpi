@@ -69,6 +69,7 @@ if test ! -x $Executable; then
 fi
 
 
+export EXECUTABLE="$Executable"
 set +e
 printf "%s" "${RequestBody-}" | "$Executable"
 exit=$?
