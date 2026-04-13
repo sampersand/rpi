@@ -1,0 +1,15 @@
+#!/bin/sh
+{
+	printf '@@HEADER@@hello: world\n'
+} | sed -e "
+/^@@HEADER@@/{
+	s///
+	w$HEADERS_FILE
+	d
+}
+/^@@STATUS@@/{
+	s///
+	w$STATUS_FILE
+	d
+}
+"
