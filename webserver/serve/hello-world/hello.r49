@@ -1,0 +1,23 @@
+#!/usr/bin/env r49
+
+load('extract-globals.r49')
+
+if $METHOD != 'GET' then
+  system('status 405 true')
+  exit()
+end
+
+$place || $place = 'world' # you can set place in query params
+
+$, = "\n"
+print(
+  '<!DOCTYPE html>',
+  '<html lang=en>',
+  '<head>',
+    sprintf("<title>Hello %s!</title>", $place),
+  '</head>',
+  '<body>',
+    sprintf('<h1>Hello, %s!</h1>', $place),
+    sprintf('<p>The time on the server is currently %s.</p>', system2('date').chop),
+  '</body>',
+  '</html>')

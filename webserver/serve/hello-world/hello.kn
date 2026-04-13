@@ -1,0 +1,26 @@
+#!/usr/bin/env -S knight -f
+
+# Make sure it's a GET request
+; & ! ? 'GET' ($ "echo $METHOD")
+	; $ "status 405 true"
+	: QUIT 0
+
+# Set content type
+; $ "header Content-Type text/html"
+
+# extract `place` from the environment
+; = place $ "env | grep '^place=' | sed s/place=//"
+; & ! place
+	: = place 'world'
+
+# Output the body
+: OUTPUT ++++++ '<!DOCTYPE html>
+<html lang=en>
+<head>
+	<title>Hello ' place ' </title>
+</head>
+<body>
+	<h1>Hello, ' place '!</h1>
+	<p>The time on the server is currently ' ($ "date") '.</p>
+</body>
+</html>'

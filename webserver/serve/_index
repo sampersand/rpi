@@ -1,1 +1,30 @@
-echo yep
+#!/bin/sh
+
+set -e
+
+h html -lang=en
+h head `h title Files to view`
+h body
+
+if [ $REQUEST_PATH != / ]; then
+	parent=$(dirname $REQUEST_PATH)
+	h div Go up a folder to `h a -href=$parent $parent`
+fi
+
+h h1 List of files underneath $REQUEST_PATH \( `ls -1 serve/$REQUEST_PATH | wc -l` total \)  #${PWD#"$WEBSERVER_ROOT"}
+h ul
+for file in serve/${REQUEST_PATH#/}/*
+do
+	[ ! -e $file ] && continue
+	h li -n
+	base=`basename $file`
+	h a -href=$REQUEST_PATH/$base -n
+	[ -d $file ] && base=$base/
+	echo "$base\c"
+	h /a -n
+	h /li
+done
+h /ul
+
+h /body
+h /html

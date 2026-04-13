@@ -4,6 +4,13 @@ test ${DEBUG-} && set -x
 IFS='&'
 set +f
 
+# If `set -a` was set earlier (ie we're sourced), then default to `export`ing
+# params, not printing them
+case $- in
+*a*) export_param () { export $1="$2"; } ;;
+*)   export_param () { printf "%s='%s'\n" $1 "$2"; }
+esac
+
 PARAMS=
 for RawParameterString in $*
 do
@@ -22,8 +29,9 @@ do
 	ParamValue=`printf '%s' "$ParamValue" | sed 's/+/ /g; s/%/\\\\x/g'`
 	ParamValue=`printf '%b' "$ParamValue" | sed "s/'/'\"'\"'/g"`
 
-	printf "%s='%s'\n" $ParamName "$ParamValue"
+	export_param $ParamName "$ParamValue"
 	PARAMS=$PARAMS${PARAMS:+:}$ParamName
 done
 
-echo PARAMS=\'$PARAMS\'
+unset RawParameterString RawParamName ParamName ParamValue
+export_param PARAMS $PARAMS

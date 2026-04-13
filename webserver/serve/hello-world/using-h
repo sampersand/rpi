@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# This is a hello world with a simple `cat` program, and only minimal
+# outside binaries
+
+# Make sure it's a GET request
+if [ $METHOD != GET ]; then
+	status 405 true
+	exit
+fi
+
+: ${place:=world} # you can add a place in the query params
+
+h html -lang=en
+h head `h title Hello, $place!`
+h body
+	h h1 Hello, $place!
+	h p The time on the server is currently `date`.
+h /body
+h /html

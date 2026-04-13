@@ -3,14 +3,14 @@
 set -euC
 test ${DEBUG-} && set -x
 
-readonly WebServerRoot=$PWD
-if ! test -d $WebServerRoot; then
-	echo "WebServerRoot does not exist: $WebServerRoot" >&2
+export WEBSERVER_ROOT=$PWD
+if ! test -d $WEBSERVER_ROOT; then
+	echo "WEBSERVER_ROOT does not exist: $WEBSERVER_ROOT" >&2
 	exit 2
 fi
 
-export RUBYLIB=$RUBYLIB${RUBYLIB:+:}$WebServerRoot/ruby-include
-PATH=$WebServerRoot/script-utils:$PATH
+export RUBYLIB=$RUBYLIB${RUBYLIB:+:}$WEBSERVER_ROOT/ruby-include
+PATH=$WEBSERVER_ROOT/script-utils:$PATH
 PATH=$PATH:$PWD/../old/copy/usr-bin
 
 Cr="`printf '\r.'`"; Cr="${Cr%.}"; readonly Cr
@@ -27,10 +27,12 @@ Cr="`printf '\r.'`"; Cr="${Cr%.}"; readonly Cr
 	export REQUEST_PATH="${RawRequest%%\?*}"
 	case $RawRequest in *\?*)
 		export QUERY_STRING=${RawRequest#"$REQUEST_PATH"\?}
-		QueryPath=`extract-url-encoding "$QUERY_STRING"`
-		set -ax
-		eval "$QueryPath"
-		set +ax
+
+		set -a -- "$QUERY_STRING"
+		. extract-url-encoding
+		QUERY_PARAMS="$PARAMS"
+		unset -v PARAMS
+		set +a
 	esac
 }
 
@@ -47,8 +49,13 @@ fi
 
 # p "RequestBody=${RequestBody-}" >&2
 
-Executable=$WebServerRoot/serve/${REQUEST_PATH#/}
-if test -d $Executable; then Executable=${Executable%/}/_index; fi # set index for default path
+Executable=$WEBSERVER_ROOT/serve/${REQUEST_PATH#/}
+if test -d $Executable; then
+	Executable=${Executable%/}/_index
+	if ! [ -e $Executable ]; then
+		Executable=$WEBSERVER_ROOT/serve/_index
+	fi
+fi # set index for default path
 
 if test ! -x $Executable; then
 	if test -f $Executable; then

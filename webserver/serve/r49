@@ -1,6 +1,5 @@
 #!/usr/bin/env r49
 
-
 load('extract-globals.r49')
 
 if $METHOD == 'POST' then
