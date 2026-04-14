@@ -1,39 +1,19 @@
 #!/bin/sh
-# {
-# 	printf '@@HEADER@@hello: world\n'
-# } | sed -e "
-# /^@@HEADER@@/{
-# 	s///
-# 	w$HEADERS_FILE
-# 	d
-# }
-# /^@@STATUS@@/{
-# 	s///
-# 	w$STATUS_FILE
-# 	d
-# }
-# "
+{
+	echo 'yo what is up?'
+	echo 'hello world!'
+	echo '@@HEADER@@hello: world'
+	echo '@@HEADER@@what: is up'
+} | sed -e '
+/^@@HEADER@@/!{
+	H
+	d
+}
+s///
+s/$/R/
+${
+	p
+	x
+}
+'
 
-# Set the content type
-header Content-Type text/html
-
-html () { echo "<html>"; if [ $# = 0 ]; then cat; else echo $*; fi; echo '</html>'; }
-head () { echo "<head>"; if [ $# = 0 ]; then cat; else echo $*; fi; echo '</head>'; }
-title () { echo "<title>"; if [ $# = 0 ]; then cat; else echo $*; fi; echo '</title>'; }
-
-: ${place:=world}
-
-cat <<EOS
-<!DOCTYPE html>
-$(html <<HTML
-$(head <<HEAD
-	`title Hello $place!`
-HEAD
-)
-<body>
-	<h1>Hello, $place!</h1>
-	<p>The time on the server is currently `date`.</p>
-</body>
-HTML
-)
-EOS
