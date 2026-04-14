@@ -1,0 +1,2 @@
+echo Hello, ${place:=world}!
+echo the time on the server is currently: `date`
