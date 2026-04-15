@@ -11,10 +11,11 @@ fi
 
 : ${place:=world} # you can add a place in the query params
 
-h html -lang=en
-h head $(h title Hello, $place!)
-h body
-	h h1 Hello, $place!
-	h p The time on the server is currently $(date).
-h /body
-h /html
+h DOCTYPE \
+html -a lang=en [ \
+	head [ title -t "Hello, $place!" ] \
+	body [ \
+		h1 -t "Hello, $place!" \
+		p -t "The time on the server is currently $(date)" \
+	] \
+]

@@ -24,10 +24,10 @@ print_current_element () {
 	[ $COMPACT ] || printf '%s' "$indent"
 	if [ "${1-}" = / ]; then
 		printf '</%s>' "$current_element"
+	elif [ "$current_element" = DOCTYPE ]; then
+		header Content-Type text/html
+		printf '<!DOCTYPE html>'
 	else
-		if [ "$current_element" = 'html' ] && [ -z "$current_attributes" ]; then
-			echo '<!DOCTYPE html>'
-		fi
 		printf '<%s%s%s>' "$current_element" "${current_attributes:+ }" "$current_attributes"
 	fi
 	[ $COMPACT ] || [ "${2-}" = no_newline ] || echo
@@ -62,7 +62,7 @@ run_program () {
 			break ;;
 		-*)
 			OPTIND=1 # we reset it each time
-			getopts 't:a:Anx:' opt # get the options
+			getopts 't:Ta:Anx:' opt # get the options
 
 			# Support chaining multiple options
 			if [ -z "${OPTARG+x}" ]; then # if no argument is supplied
@@ -73,6 +73,12 @@ run_program () {
 				esac
 			else
 				shift $(( $OPTIND - 1 )) # delete the flag and its value
+			fi
+
+			if [ $opt = "T" ]; then
+				opt=t
+				OPTARG="$*"
+				shift $#
 			fi
 
 			case $opt in

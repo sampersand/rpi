@@ -7,16 +7,14 @@ endif
 
 if ( ! $?place ) set place = world
 
-alias h  'echo "<\!:*>"'
-alias ht 'echo "<\!:1> \!:2* </\!:1>"'
-
-h \!DOCTYPE html
-h html lang=en
-h head
-ht title Hello $place\!
-h /head
-h body
-ht h1 Hello, $place\!
-ht p The time on the server is currently `date`.
-h /body
+# Also showcases the `h` command without using `[`s
+h DOCTYPE
+h html -a leng=en
+	h head
+		h title -T Hello $place!
+	h /head
+	h body
+		h h1 -T Hello, $place\!
+		h p -T The time on the server is currently `date`.
+	h /body
 h /html

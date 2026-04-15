@@ -16,9 +16,7 @@ if ( $?HEADER_Accept ) then
 	endif
 endif
 
-header Content-Type text/html
-
-h.sh html [ \
+h DOCTYPE html [ \
 	head [] \
 	body [ \
 		table -aborder=1 -acellpadding=10 -acellspacing=0 [ \
