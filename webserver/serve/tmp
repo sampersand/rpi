@@ -1,19 +1,6 @@
 #!/bin/sh
-{
-	echo 'yo what is up?'
-	echo 'hello world!'
-	echo '@@HEADER@@hello: world'
-	echo '@@HEADER@@what: is up'
-} | sed -e '
-/^@@HEADER@@/!{
-	H
-	d
-}
-s///
-s/$/R/
-${
-	p
-	x
-}
-'
 
+echo 'yo what is up?'
+echo 'hello world!'
+echo '@@HEADER@@hello: world'
+echo '@@HEADER@@what: is up'

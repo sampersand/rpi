@@ -2,11 +2,13 @@
 
 # Make sure it's a GET request
 ; & ! ? 'GET' ($ "echo $METHOD")
-	; $ "status 405 true"
+	; OUTPUT "@@STATUS@@HTTP/1.1 405 Method Not Allowed"
+	; OUTPUT "@@HEADER@@Content-Type: text/plain"
+	; OUTPUT "405 Method Not Allowed"
 	: QUIT 0
 
 # Set content type
-; $ "header Content-Type text/html"
+; OUTPUT "@@HEADER@@Content-Type: text/html"
 
 # extract `place` from the environment
 ; = place $ "env | grep '^place=' | sed s/place=//"

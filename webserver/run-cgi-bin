@@ -1,9 +1,14 @@
 #!/bin/dash
 
 set -euC
-test ${DEBUG-} && set -x
 
 export WEBSERVER_ROOT=$PWD
+
+if test ${DEBUG-}; then
+	export PS4='+ ${0#"$WEBSERVER_ROOT"/}:$LINENO> '; set -x;
+	set -x
+fi
+
 if ! test -d $WEBSERVER_ROOT; then
 	echo "WEBSERVER_ROOT does not exist: $WEBSERVER_ROOT" >&2
 	exit 2
@@ -70,15 +75,32 @@ fi
 
 
 export EXECUTABLE="$Executable"
-set +e
-printf "%s" "${RequestBody-}" | "$Executable"
-exit=$?
-set -e
+readonly ExitStatusFifo=`dirname $HEADERS_FILE`/exit-status-fifo
+mkfifo $ExitStatusFifo
+trap 'rm "$ExitStatusFifo"' 0
+(
+	set +e
+	printf "%s" "${RequestBody-}" | "$Executable"
+	echo $? > $ExitStatusFifo
+) | sed -e "
+/^@@HEADER@@/{
+	s///
+	w$HEADERS_FILE
+	d
+}
+/^@@STATUS@@/{
+	s///
+	w$STATUS_FILE
+	d
+}" &
+
+read Exit < $ExitStatusFifo
+wait
 
 # If status file already has something, just use that
 if test -s "$STATUS_FILE"; then
 	: # do nothing
-elif test $exit -eq 0; then
+elif test $Exit -eq 0; then
 	# if exit code is `0`, then that's success
 	status 200
 else
