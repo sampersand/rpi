@@ -62,6 +62,16 @@ if test -d $Executable; then
 	fi
 fi # set index for default path
 
+# export the executable
+export EXECUTABLE="$Executable"
+
+# IF a multiplexer exists, call that with the executable as the frist arg
+Mux=`dirname $Executable`/_mux
+if [ -e $Mux ]; then
+	set $Executable "$@"
+	Executable=$Mux
+fi
+
 if test ! -x $Executable; then
 	if test -f $Executable; then
 		warn got non-executable serve file: $Executable
@@ -73,8 +83,6 @@ if test ! -x $Executable; then
 	exit 0
 fi
 
-
-export EXECUTABLE="$Executable"
 readonly ExitStatusFifo=`dirname $HEADERS_FILE`/exit-status-fifo
 mkfifo $ExitStatusFifo
 trap 'rm "$ExitStatusFifo"' 0

@@ -1,7 +1,5 @@
 #!/bin/tcsh
 
-setenv METHOD GET
-
 if ( $METHOD != GET ) then
 	status 405 true
 	exit
