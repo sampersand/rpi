@@ -17,11 +17,11 @@ int main(){
 
 	puts("<!DOCTYPE html>");
 	puts("<html lang=en>");
-	printf("<title> Hello %s! </title>\n", place);
+	printf("<title> Hello %s! (C)</title>\n", place);
 	puts("</head>");
 	puts("<body>");
-	printf("<h1> Hello, %s! </h1>\n", place);
-	printf("<p> The time on the server is currently "), fflush(stdout), system("date"), printf(".</p>\n");
+	printf("<h1> Hello, %s! (C)</h1>\n", place);
+	printf("<p> The time on the server is currently <span style=\"font-style: italic\">"), fflush(stdout), system("date"), printf("</span>.</p>\n");
 	puts("</body>");
 	puts("</html>");
 }

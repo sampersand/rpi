@@ -17,5 +17,6 @@ html -a lang=en [ \
 	body [ \
 		h1 -t "Hello, $place!" \
 		p -t "The time on the server is currently $(date)" \
+		# <span style="font-style: italic">
 	] \
 ]

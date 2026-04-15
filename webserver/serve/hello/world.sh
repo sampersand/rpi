@@ -20,11 +20,14 @@ cat <<EOS
 <!DOCTYPE html>
 <html lang=en>
 <head>
-	<title>Hello $place!</title>
+	<title>Hello $place! (Minimal SH)</title>
 </head>
 <body>
-	<h1>Hello, $place!</h1>
-	<p>The time on the server is currently `date`.</p>
+	<h1>Hello, $place! (Minimal SH)</h1>
+	<p>
+		The time on the server is currently
+		<span style="font-style: italic">`date`</span>.
+	</p>
 </body>
 </html>
 EOS
