@@ -7,11 +7,15 @@ newline='
 '
 case $element in
 	/*) if [ "$1" = -n ]; then newline=; shift; fi
-		if [ $# -ne 0 ]; then
-			echo "cannot give arguments to closing html element" >&2
-			exit 2
-		fi
-		printf "<$element>$newline"
+		set -- "$element" "$@"
+		for ele do
+			case $ele in
+				/*) printf "<$element>$newline" ;;
+				*)
+					echo "cannot give arguments to closing html element" >&2
+					exit 2
+			esac
+		done
 		exit ;;
 esac
 

@@ -1,0 +1,30 @@
+#!/usr/bin/env r49
+#
+load('webserver-main.r49')
+
+if %HEADERS['Accept'] == 'application/json' then
+	system('header Content-Type application/json')
+	output = \json
+else
+	system('header Content-Type application/html')
+	output = \html
+end
+processes = 
+
+p(%HEADERS)
+
+# if ( $METHOD != GET ) then
+# 	status 405 true
+# 	exit
+# endif
+#
+# if ( $?HEADER_Accept ) then
+#
+#
+# h html
+#
+# p "$HEADER_Accept"
+#
+# echo
+# ps -aux | wc -l
+# h /html

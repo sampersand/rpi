@@ -1,0 +1,123 @@
+#!/bin/bash
+set -euC
+
+readonly RS=$(printf '\036') US=$(printf '\037') TAB=$(printf '\t')
+
+: ${COMPACT=} # If supplied, `COMPACT` will remove unneeded whitesapce
+
+push_element () {
+	element_stack=$element_stack$RS$current_element$US$current_attributes
+	current_element=
+	current_attributes=
+	indent=$indent$TAB
+}
+
+pop_element () {
+	tmp=${element_stack##*$RS}
+	current_element=${tmp%%$US*}
+	current_attributes=${tmp##*$US}
+	element_stack=${element_stack%$RS*};
+	indent=${indent%?}
+}
+
+print_current_element () {
+	[ $COMPACT ] || printf '%s' "$indent"
+	if [ "${1-}" = / ]; then
+		printf '</%s>' "$current_element"
+	else
+		if [ "$current_element" = 'html' ] && [ -z "$current_attributes" ]; then
+			echo '<!DOCTYPE html>'
+		fi
+		printf '<%s%s%s>' "$current_element" "${current_attributes:+ }" "$current_attributes"
+	fi
+	[ $COMPACT ] || [ "${2-}" = no_newline ] || echo
+}
+
+element_stack=
+current_element=
+current_attributes=
+was_printed=
+indent=''
+run_program () {
+	while [ $# -ne 0 ]; do
+		case $1 in
+		\[\])
+			shift
+			set -- '[' ']' "$@" ;;
+		\[)
+			shift
+			print_current_element
+			push_element
+			run_program "$@"
+			shift $(( $# - $REPLY ))
+			# p "before popping, current element is: $element_stack"
+			pop_element
+			# p "after popping, current element is: $element_stack $current_element"
+			print_current_element /
+			was_printed=1
+			;;
+		\])
+			shift
+			REPLY=$#
+			break ;;
+		-*)
+			OPTIND=1 # we reset it each time
+			getopts 't:a:Anx:' opt # get the options
+
+			# Support chaining multiple options
+			if [ -z "${OPTARG+x}" ]; then # if no argument is supplied
+				case $1 in
+				-?) shift ;; # just delete it
+				-?*) tmp=$1; shift; set -- "-${tmp#-?}" "$@" ;;
+				*) echo "bad first arg: $1 (bug)" >&2; exit 2
+				esac
+			else
+				shift $(( $OPTIND - 1 )) # delete the flag and its value
+			fi
+
+			case $opt in
+			x)
+				indent=$(xx -c $OPTARG "$TAB") ;;
+			n)
+				current_newline= ;; # TODO
+			N)
+				current_newline=1 ;;
+			A)
+				current_attributes= ;;
+			a)
+				current_attributes=$current_attributes${current_attributes:+ }$OPTARG ;;
+			t)
+				print_current_element '' no_newline
+				printf '%s' "$OPTARG"
+				indent= print_current_element '/'
+				was_printed=1
+				;;
+			*)
+				echo bad argument: $opt >&2; exit 2
+			esac
+
+			# getopts 'hs:' opt
+			# case $opt in
+			# h) usage; exit ;;
+			# s) exit 2 ;;
+			# *) echo bad argument: $opt >&2; exit 2
+			# esac
+			;;
+		*)
+			if [ -n "$current_element" ] && [ ! $was_printed ]; then
+				print_current_element
+			fi
+			current_element=$1
+			current_attributes=
+			was_printed=
+			shift
+			;;
+		esac
+	done
+
+	if [ -n "$current_element" ] && [ ! $was_printed ]; then
+		print_current_element
+	fi
+}
+
+run_program "$@"

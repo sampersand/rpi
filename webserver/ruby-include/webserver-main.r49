@@ -1,0 +1,21 @@
+#!r49
+
+def p(x) printf($stderr, "%s\n", x._inspect); $stderr.flush end
+
+$ENV['DEBUG'] && $DEBUG = 1
+$METHOD = $ENV['METHOD']
+$QUERY_PARAMS = {}
+
+for param in ($ENV['QUERY_PARAMS'] || '').split(':')
+	param == '' && break
+	eval(sprintf("$%s = $QUERY_PARAMS[param] = getenv(param)", param))
+end
+
+%HEADERS = {}
+for header in ($ENV['HEADERS'] || '').split(':')
+	header == '' && break
+	value = getenv(header)
+	header.sub(/^HEADER_/, '')
+	header.tr('_', '-')
+	%HEADERS[header] = value
+end

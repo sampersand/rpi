@@ -1,6 +1,6 @@
 #!/usr/bin/env r49
 
-load('extract-globals.r49')
+load('webserver-main.r49')
 
 if $METHOD == 'POST' then
   load('extract-url-encoding.r49')

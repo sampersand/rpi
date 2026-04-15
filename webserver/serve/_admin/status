@@ -1,0 +1,31 @@
+#!/bin/tcsh -f
+
+if ( $METHOD != GET ) then
+	status 405 true
+	exit
+endif
+
+set num_procs = `ps -ax | wc -l`
+
+if ( $?HEADER_Accept ) then
+	if ( $HEADER_Accept:q == application/json ) then
+		header Content-Type application/json
+
+		echo '{"num_procs:"'"$num_procs"'}'
+		exit
+	endif
+endif
+
+header Content-Type text/html
+
+h.sh html [ \
+	head [] \
+	body [ \
+		table -aborder=1 -acellpadding=10 -acellspacing=0 [ \
+			thead [ th -t Metric -t Value ] \
+			tbody [ \
+				tr [ td -t "Num Procs" -t "$num_procs" ] \
+				tr [ td -t "another field" -t "foobar" ] \
+			] \
+		] \
+	] ]
