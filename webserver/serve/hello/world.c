@@ -22,6 +22,7 @@ int main(){
 	puts("<body>");
 	printf("<h1> Hello, %s! (C)</h1>\n", place);
 	printf("<p> The time on the server is currently <span style=\"font-style: italic\">"), fflush(stdout), system("date"), printf("</span>.</p>\n");
+	puts("<p> It's a good day today! </p>");
 	puts("</body>");
 	puts("</html>");
 }

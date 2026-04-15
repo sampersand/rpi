@@ -19,5 +19,6 @@ print(
   '<body>',
     sprintf('<h1>Hello, %s! (Ruby 0.49)</h1>', $place),
     sprintf('<p>The time on the server is currently <span style="font-style: italic">%s</span>.</p>', system2('date').chop),
+  "<p> It's a good day today! </p>",
   '</body>',
   '</html>')

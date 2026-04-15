@@ -21,5 +21,6 @@ h html -a leng=en
 			echo -n `date`.
 			h /span
 		h /p
+		h p -T It\'s a good day today!
 	h /body
 h /html

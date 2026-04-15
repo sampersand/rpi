@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/dash
 set -euC
 
 readonly RS=$(printf '\036') US=$(printf '\037') TAB=$(printf '\t')
@@ -22,6 +22,7 @@ pop_element () {
 
 print_current_element () {
 	[ $COMPACT ] || printf '%s' "$indent"
+	[ "$current_element" = @ ] && return
 	if [ "${1-}" = / ]; then
 		printf '</%s>' "$current_element"
 	elif [ "$current_element" = DOCTYPE ]; then

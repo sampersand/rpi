@@ -28,6 +28,7 @@ cat <<EOS
 		The time on the server is currently
 		<span style="font-style: italic">`date`</span>.
 	</p>
+	<p> It's a good day today! </p>
 </body>
 </html>
 EOS

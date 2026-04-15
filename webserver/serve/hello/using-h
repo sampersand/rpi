@@ -16,7 +16,11 @@ html -a lang=en [ \
 	head [ title -t "Hello, $place!" ] \
 	body [ \
 		h1 -t "Hello, $place!" \
-		p -t "The time on the server is currently $(date)" \
-		# <span style="font-style: italic">
+		p [ \
+			@ -t "The time on the server is currently " \
+			span -nx0 -a style=font-style:italic -t "$(date)" \
+			@ -t . \
+		] \
+		p -t "It's a good day today!" \
 	] \
 ]
