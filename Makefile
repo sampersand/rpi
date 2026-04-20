@@ -21,13 +21,14 @@ deploy: copy-files initial-startup
 copy-files:
 	@echo "== copying files over =="
 	@$(SP) scp -r ./webserver $(PI_HOST):~/
-	@$(SP) scp -r ./pi-initial-setup.sh $(PI_HOST):~/
+	@$(SP) scp -r ./deploy/* $(PI_HOST):~/
+	@#$(SP) scp -r ./pi-initial-setup.sh $(PI_HOST):~/
 	@# $(SP) scp -r ./copy/usr-bin/. $(PI_HOST):/tmp/bin
 	@# $(SP) ssh "$(PI_HOST)" "sudo mv /tmp/bin/* /usr/bin"
 
 initial-startup:
 	@echo "== running initial startup script =="
-	@$(SP) ssh "$(PI_HOST)" 'sh ~/pi-initial-setup.sh'
+	@#$(SP) ssh "$(PI_HOST)" 'sh ~/pi-initial-setup.sh'
 
 webserver:
 	@$(SP) ssh "$(PI_HOST)" 'pkill webserver; ~/bin/webserver 2>&1'

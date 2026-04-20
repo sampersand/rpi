@@ -2,8 +2,6 @@
 
 set -euC
 
-export WEBSERVER_ROOT=$PWD
-
 if test ${DEBUG-}; then
 	export PS4='+ ${0#"$WEBSERVER_ROOT"/}:$LINENO> '; set -x;
 	set -x
@@ -14,9 +12,7 @@ if ! test -d $WEBSERVER_ROOT; then
 	exit 2
 fi
 
-export RUBYLIB=$RUBYLIB${RUBYLIB:+:}$WEBSERVER_ROOT/ruby-include
-PATH=$WEBSERVER_ROOT/script-utils:$PATH
-PATH=$PATH:$PWD/../old/copy/usr-bin
+#PATH=$PATH:$PWD/../old/copy/usr-bin
 
 Cr="`printf '\r.'`"; Cr="${Cr%.}"; readonly Cr
 

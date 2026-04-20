@@ -19,6 +19,6 @@ sp scp -r ./copy/usr-bin/. $pi_host:/tmp/bin
 sp ssh "$pi_host" "sudo mv /tmp/bin/* /usr/bin"
 
 echo == running initial startup script ==
-sp ssh "$pi_host" 'sh ~/pi-initial-setup.sh'
-sp ssh "$pi_host" 'pkill webserver && ~/bin/webserver 2>&1'
+# sp ssh "$pi_host" 'sh ~/pi-initial-setup.sh'
+# sp ssh "$pi_host" 'pkill webserver && ~/bin/webserver 2>&1'
 

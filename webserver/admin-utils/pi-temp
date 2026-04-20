@@ -1,0 +1,31 @@
+#!/usr/bin/env r49
+
+load('utils.r49')
+
+def usage
+	abortf("usage: %s [-f / -c / -r]\nf = Fahrenheit\nc = Celsius\nr = raw", $0)
+end
+
+$*.length != 1 && usage()
+
+case $*[0]
+when '-r'; $temp = \raw
+when '-f'; $temp = \fahrenheit
+when '-c'; $temp = \celsius
+else usage()
+end
+
+%TEMP_FILE = $ENV['TEMPERATURE_FILE'] || '/sys/class/thermal/thermal_zone0/temp'
+
+temp_raw = File.read(%TEMP_FILE).to_i
+if ( $temp == \raw )
+	$\ = "\n"
+	print(temp_raw)
+else
+	temp_celsius = temp_raw / 1000.0
+	if $temp == \celsius
+		printf("%.2f\n", temp_celsius)
+	else
+		printf("%.2f\n", (temp_celsius * 1.8) + 32)
+	end
+end

@@ -48,7 +48,7 @@ stack=
 current_element=
 current_attributes=
 was_printed=
-indent=''
+indent=`xx -c ${INDENT:-0} "$TAB"`
 newline=1
 run_program () {
 	while [ $# -ne 0 ]; do

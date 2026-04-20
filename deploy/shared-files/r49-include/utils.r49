@@ -1,0 +1,39 @@
+# Utilities that should be available to all Ruby 0.49 programs
+
+# Print debug representation of the arg to stderr
+def p(x)
+	printf($stderr, "%s\n", x._inspect); $stderr.flush
+end
+
+# Exit prematurely
+def abortf(fmt, *args)
+  printf($stderr, "%s: " + fmt + "\n", *args)
+  exit(2)
+end
+
+# Same as `fail`, except it takes an `sprintf` argument
+def failf(fmt, *args) fail(sprintf(fmt, *args)) end
+
+# Same as `system`, except it `fail`s on failure
+def system_e(cmd)
+	ret = system(cmd)
+	if $? != 0 then failf("system call %s failed with code %d", cmd._inspect, $?) end
+	ret
+end
+
+# Same as `system2`, except it `fail`s on failure
+def system2_e(cmd)
+	ret = system2(cmd)
+	if $? != 0 then failf("system call %s failed with code %d", cmd._inspect, $?) end
+	ret
+end
+
+def File.read(path)
+  f = open(path, 'r')
+
+  protect
+    f.read
+  ensure
+    f.close
+  end
+end

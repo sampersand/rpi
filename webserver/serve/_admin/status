@@ -29,27 +29,29 @@ cat <<EOS
 <body>
 EOS
 
+setenv INDENT 1
 h h1 -T "Status of the PI"
 
 ################################################################################
 #                                 Energy State                                 #
 ################################################################################
 
-if ( -e $Temperature_File:q ) then
-	set Raw_Temp_C = `cat $Temperature_File`
-	set Temp_C = `echo "scale=1; $Raw_Temp_C / 1000" | bc`
-	set Temp_F = `echo "scale=1; ($Temp_C * 1.8) + 32" | bc`
-	if ( $Raw_Temp_C < 60000 ) then
+if ( $uname == Darwin ) then
+	set Temp_C = 'N/A' Temp_F = 'N/A' Temp_Status = '&lt;not available&gt;'
+else
+	set Temp_C = `pi-temp -c`
+	set Temp_F = `pi-temp -f`
+	set Raw_Temp = `pi-temp -r`
+
+	if ( $Raw_Temp < 60000 ) then
 		set Temp_Status = '🟢 Normal'
-	else if ( $Raw_Temp_C < 80000 ) then
+	else if ( $Raw_Temp < 80000 ) then
 		set Temp_Status = '🟡 Warm'
-	else if ( $Raw_Temp_C < 85000 ) then
+	else if ( $Raw_Temp < 85000 ) then
 		set Temp_Status = '🟠 Hot'
 	else
 		set Temp_Status = '🔴 Critical'
 	endif
-else
-	set Temp_C = 'N/A' Temp_F = 'N/A' Temp_Status = '&lt;not available&gt;'
 endif
 
 set Current_Voltage = `current-voltage | slurp -s ', '`
@@ -79,14 +81,17 @@ table Metric Value : \
 ################################################################################
 #                             Memory + Disk Usage                              #
 ################################################################################
+set DS = '$'
 
 if ( $uname == Darwin ) then
-	echo -n "(macos): "
-	set Memory_Usage = "`{ vm_stat; sysctl -n hw.memsize; } | awk '/page size/{p=$8} /Pages (active|wired down):|occupied by compressor/{gsub(/\./,"",$NF); u+=$NF} /^[0-9]+$/{t=$1} END{printf "%.1f%% used\n", (u*p/t)*100}'`"
-	set Memory_Usage_Status = '<TODO>'
+	set Memory_Usage = "`{ vm_stat; sysctl -n hw.memsize; } | awk '/page size/{p=${DS}8} /Pages (active|wired down):|occupied by compressor/{gsub(/\./,"",$NF); u+=$NF} /^[0-9]+$/{t=${DS}1} END{printf "%.1f%% used\n", (u*p/t)*100}'`"
+	set Memory_Usage_Status = '&lt;TODO&gt;'
+
+	set CPU_Usage = "`top -l 1 | awk '/CPU usage/{print}'`"
+	set CPU_Usage_Status = '&lt;TODO&gt;'
 else
-	set Memory_Usage = "`free | awk '/^Mem:/ {printf "%d MB / %d MB (%.1f%%)\n", $3/1024, $2/1024, $3/$2 * 100}'`"
-	set Memory_Usage_Percentage = `echo $x | sed 's/.*(\(.*\)\..*%)/\1/'`
+	set Memory_Usage = "`free | awk -v f='%d MB / %d MB (%.1f%%)\n' '/^Mem:/ {printf f, ${DS}3/1024, ${DS}2/1024, ${DS}3/${DS}2 * 100}'`"
+	set Memory_Usage_Percentage = `echo "$Memory_Usage" | sed 's/.*(\(.*\)\..*%)/\1/'`
 	if ( $Memory_Usage_Percentage <= 50 ) then
 		set Memory_Usage_Status = '🟢 Normal'
 	else if ( $Memory_Usage_Percentage <= 65 ) then
@@ -97,78 +102,27 @@ else
 		set Memory_Usage_Status = '🔴 Critical'
 	endif
 
-fi
+
+	set CPU_Usage = "`top -bn1 | awk -v f='%.1f%% used\n' '/^%Cpu/{printf f, 100-${DS}8}'`"
+	#set CPU_Usage_Raw = `echo "$CPU_Usage" | `
+	set CPU_Usage_Status = '&lt;TODO&gt;'
+endif
+
+set Disk_Space = "`df -h / | awk -v f='%s / %s (%s used)' 'NR==2{printf f, ${DS}3, ${DS}4, ${DS}5}'`"
+set Disk_Space_Percentage = `echo "$Disk_Space" | sed 's/.*(\(.*\)%.*/\1/'`
+if ( $Disk_Space_Percentage <= 50 ) then
+	set Disk_Space_Status = '🟢 Normal'
+else if ( $Disk_Space <= 75 ) then
+	set Disk_Space_Status = '🟡 Medium'
+else if ( $Disk_Space <= 85 ) then
+	set Disk_Space_Status = '🟠 High'
+else
+	set Disk_Space_Status = '🔴 Critical'
+endif
 
 h h2 -T Memory + Disk Usage
 table Metric Value Health : \
-
-
-################################################################################
-#                                     TODO                                     #
-################################################################################
-
-echo Memory Usage:
-if ( $uname == Darwin ) then
-endif
-h br/
-
-echo Disk Space:
-df -h / | awk 'NR==2{printf "%s / %s (%s used)", $3, $4, $5}'
-h br/
-
-
-echo Number of procs:
-ps -ax | wc -l
-h br/
-
-
-echo CPU Usage:
-if ( $uname == Darwin ) then
-	top -l 1 | awk '/CPU usage/{print}'
-else
-	top -bn1 | awk '/^%Cpu/{printf "%.1f%% used\n", 100-$8}'
-endif
-h br/
-
-
-# Ram
-
-# Load average
-
-# Throttling / Under-voltage (Pi-specific)
-# bashvcgencmd get_throttled
-# # returns hex flags, 0x0 means all good
-# # 0x50005 means currently throttled + under-voltage
-
-# Bandwidth / Network
-# bashcat /proc/net/dev   # cumulative bytes per interface
-# # to get a rate, you read it twice with a sleep in between
-
-
-h /body /html
-
-exit
-
-if ( $?HEADER_Accept ) then
-	if ( $HEADER_Accept:q == application/json ) then
-		header Content-Type application/json
-
-		printf '{"num_procs":%d' $Num_Procs
-		if ( $?Temp_f ) then
-			printf ',"temp_f":%d' $Num_Procs
-			printf  -n ',"temp":'$Temp_f
-		exit
-	endif
-endif
-
-h DOCTYPE html [ \
-	head [] \
-	body [ \
-		table -aborder=1 -acellpadding=10 -acellspacing=0 [ \
-			thead [ th -t Metric -t Value ] \
-			tbody [ \
-				tr [ td -t "Num Procs" -t "$Num_Procs" ] \
-				tr [ td -t "another field" -t "foobar" ] \
-			] \
-		] \
-	] ]
+	'Memory Usage' "$Memory_Usage" "$Memory_Usage_Status" \
+	'CPU Usage' "$CPU_Usage" "$CPU_Usage_Status" \
+	'Disk Space' "$Disk_Space" "$Disk_Space_Status" \
+	'Number of procs' "`ps -ax | wc -l`" 'n/a' \

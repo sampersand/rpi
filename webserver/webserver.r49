@@ -1,17 +1,30 @@
 #!/usr/bin/env -S r49 -s
 
 ################################################################################
-#                               Helper Functions                               #
+#                                  Setup Env                                   #
 ################################################################################
 
-# Debugging code
-def p(x) printf($stderr, "%s\n", x._inspect); $stderr.flush end
+def $ENV.get_and_colon(key, where)
+  tmp = self[key] || return ''
 
-# Exit prematurely
-def abort(fmt, *args)
-  printf($stderr, "%s: " + fmt + "\n", *args)
-  exit(2)
+  case where
+  when \before; ':' + tmp
+  when \after; tmp + ':'
+  else fail("bad where: " + where._inspect)
+  end
 end
+
+if ($ENV['WEBSERVER_ROOT'] || '') == ''
+  $ENV['WEBSERVER_ROOT'] = Dir.pwd
+end
+
+$ENV['PATH'] = ($ENV['WEBSERVER_ROOT'] + '/script-utils') + $ENV.get_and_colon('PATH', \before)
+
+load('utils.r49')
+
+################################################################################
+#                               Helper Functions                               #
+################################################################################
 
 # Read a file file and return it
 def File.touch(path)
@@ -53,18 +66,18 @@ end
 
 # Make sure tempdir doesn't have weird characters and is absolute
 if %TEMPDIR =~ /[^\/a-zA-Z0-9.]/ || %TEMPDIR[0] !~ ?/ then
-  abort("Bad tempdir %s (must be absolute and only have [A-Za-z0-9.])", %TEMPDIR)
+  abortf("Bad tempdir %s (must be absolute and only have [A-Za-z0-9.])", %TEMPDIR)
 end
 
 # Make sure the cgi-bin (ie the program that handles the dispatching) is executable
 unless File.x(%CGI_BIN)
-  abort("CGI bin path %s is not executable", %CGI_BIN)
+  abortf("CGI bin path %s is not executable", %CGI_BIN)
 end
 
-# If the tempdir doesn't exist, try to make it. If we can't, abort.
+# If the tempdir doesn't exist, try to make it. If we can't, abortf.
 unless File.d(%TEMPDIR)
   if system("mkdir -p " + %TEMPDIR) != 0 then
-    abort("Couldn't make tempdir: %s", %TEMPDIR)
+    abortf("Couldn't make tempdir: %s", %TEMPDIR)
   end
 end
 
