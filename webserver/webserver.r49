@@ -130,7 +130,36 @@ def handle_request2(conn)
   printf(conn, '%s', body)
 end
 
+def set_reuse_addr(server)
+  sol_socket = system2("echo '#include <sys/socket.h>' | cc -E -dM - | grep 'SOL_SOCKET' | sed 's/.*SOL_SOCKET //'")
+  $? != 0 && sol_socket = '<err return>'
+  sol_socket =
+    case sol_socket
+    when /^0[xX][a-fA-F0-9]+/; $&.hex
+    when /^0[0-7]+/; $&.oct
+    when /^\d+/; $&.to_i
+    else
+     printf($stderr, "[WARN] problem getting SOL_SOCKET; not setting reuse addr: %s\n", sol_socket)
+     return
+    end
+
+  so_reuseaddr = system2("echo '#include <sys/socket.h>' | cc -E -dM - | grep 'SO_REUSEADDR' | sed 's/.*SO_REUSEADDR //'")
+  $? != 0 && so_reuseaddr = '<err return>'
+  so_reuseaddr =
+    case so_reuseaddr
+    when /^0[xX][a-fA-F0-9]+/; $&.hex
+    when /^0[0-7]+/; $&.oct
+    when /^\d+/; $&.to_i
+    else
+      printf($stderr, "[WARN] problem getting SO_REUSEADDR; not setting reuse addr: %s\n", so_reuseaddr)
+      return
+    end
+
+  server.setopt(sol_socket, so_reuseaddr, "1")
+end
+
 server = TCPserver.open(%PORT)
+#set_reuse_addr(server)
 print("Starting to listen for connections on ", %PORT, "\n")
 
 protect

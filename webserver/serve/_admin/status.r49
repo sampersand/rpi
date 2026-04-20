@@ -1,0 +1,54 @@
+#!/usr/bin/env r49
+
+load('webserver-main.r49')
+
+if $METHOD != 'GET' then
+	system('status 405 true')
+	exit()
+end
+
+num_procs = system2_e('ps -ax | wc -l')
+
+temp_c = system2_e('vcgencmd measure_temp | tr -dC 0-9.')
+temp_f = system2_e('vcgencmd measure_temp | tr -dC 0-9.')
+
+exit()
+__END__
+set num_procs = `ps -ax | wc -l`
+set temp_c = `vcgencmd measure_temp | tr -dC 0-9.`
+set temp_f = `echo "($temp_c * 1.8) + 32" | bc`
+if ( $temp_f )
+
+# # set is_pi = 0
+# if ( { grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null } ) then
+# 	# we're on a pi
+
+# 	vcgencmd measure_temp
+
+# if ( -f /proc/device-tree/model )
+
+# cat /proc/device-tree/model
+
+To convert Celsius to Fahrenheit, use the formula °F = (°C × 1.8) + 32. For example, 25°C is equal to 77°F.
+Expii acdirect.com
+
+if ( $?HEADER_Accept ) then
+	if ( $HEADER_Accept:q == application/json ) then
+		header Content-Type application/json
+
+		echo '{"num_procs:"'"$num_procs"'}'
+		exit
+	endif
+endif
+
+h DOCTYPE html [ \
+	head [] \
+	body [ \
+		table -aborder=1 -acellpadding=10 -acellspacing=0 [ \
+			thead [ th -t Metric -t Value ] \
+			tbody [ \
+				tr [ td -t "Num Procs" -t "$num_procs" ] \
+				tr [ td -t "another field" -t "foobar" ] \
+			] \
+		] \
+	] ]

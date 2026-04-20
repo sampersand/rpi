@@ -1,17 +1,162 @@
-#!/bin/tcsh -f
+#!/bin/tcsh
 
 if ( $METHOD != GET ) then
 	status 405 true
 	exit
 endif
 
-set num_procs = `ps -ax | wc -l`
+set path = ($path:q $WEBSERVER_ROOT/admin-utils )
+
+set uname = `uname`
+set Temperature_File = /sys/class/thermal/thermal_zone0/temp
+
+header Content-Type 'text/html; charset=UTF-8'
+cat <<EOS
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Webserver Status</title>
+	<style>
+		table, th, td {
+			border: 1px solid
+		}
+
+		th, td {
+			padding: 10px;
+		}
+	</style>
+</head>
+<body>
+EOS
+
+h h1 -T "Status of the PI"
+
+################################################################################
+#                                 Energy State                                 #
+################################################################################
+
+if ( -e $Temperature_File:q ) then
+	set Raw_Temp_C = `cat $Temperature_File`
+	set Temp_C = `echo "scale=1; $Raw_Temp_C / 1000" | bc`
+	set Temp_F = `echo "scale=1; ($Temp_C * 1.8) + 32" | bc`
+	if ( $Raw_Temp_C < 60000 ) then
+		set Temp_Status = '🟢 Normal'
+	else if ( $Raw_Temp_C < 80000 ) then
+		set Temp_Status = '🟡 Warm'
+	else if ( $Raw_Temp_C < 85000 ) then
+		set Temp_Status = '🟠 Hot'
+	else
+		set Temp_Status = '🔴 Critical'
+	endif
+else
+	set Temp_C = 'N/A' Temp_F = 'N/A' Temp_Status = '&lt;not available&gt;'
+endif
+
+set Current_Voltage = `current-voltage | slurp -s ', '`
+if ( $#Current_Voltage == 0 ) then
+	set Current_Voltage = 'All Good!'
+	set Current_Voltage_Status = '🟢 Clear!'
+else if ( "$Current_Voltage" =~ *Currently* ) then
+	set Current_Voltage_Status = '🔴 Current Problems'
+else
+	set Current_Voltage_Status = '🟡 Historical Problems'
+endif
+
+h h2 -T Energy State
+table   Metric      Value                       Health : \
+	Temperature "${Temp_C}ºC / ${Temp_F}ºF" "$Temp_Status" \
+	Voltage     "$Current_Voltage"          "$Current_Voltage_Status" \
+
+################################################################################
+#                                    Timing                                    #
+################################################################################
+
+h h2 -T Timing
+table Metric Value : \
+	Uptime         "`uptime | cut -f1 -d, | sed 's/.*up/up/'`" \
+	'Current Time' "`date`"
+
+################################################################################
+#                             Memory + Disk Usage                              #
+################################################################################
+
+if ( $uname == Darwin ) then
+	echo -n "(macos): "
+	set Memory_Usage = "`{ vm_stat; sysctl -n hw.memsize; } | awk '/page size/{p=$8} /Pages (active|wired down):|occupied by compressor/{gsub(/\./,"",$NF); u+=$NF} /^[0-9]+$/{t=$1} END{printf "%.1f%% used\n", (u*p/t)*100}'`"
+	set Memory_Usage_Status = '<TODO>'
+else
+	set Memory_Usage = "`free | awk '/^Mem:/ {printf "%d MB / %d MB (%.1f%%)\n", $3/1024, $2/1024, $3/$2 * 100}'`"
+	set Memory_Usage_Percentage = `echo $x | sed 's/.*(\(.*\)\..*%)/\1/'`
+	if ( $Memory_Usage_Percentage <= 50 ) then
+		set Memory_Usage_Status = '🟢 Normal'
+	else if ( $Memory_Usage_Percentage <= 65 ) then
+		set Memory_Usage_Status = '🟡 Medium'
+	else if ( $Memory_Usage_Percentage <= 80 ) then
+		set Memory_Usage_Status = '🟠 High'
+	else
+		set Memory_Usage_Status = '🔴 Critical'
+	endif
+
+fi
+
+h h2 -T Memory + Disk Usage
+table Metric Value Health : \
+
+
+################################################################################
+#                                     TODO                                     #
+################################################################################
+
+echo Memory Usage:
+if ( $uname == Darwin ) then
+endif
+h br/
+
+echo Disk Space:
+df -h / | awk 'NR==2{printf "%s / %s (%s used)", $3, $4, $5}'
+h br/
+
+
+echo Number of procs:
+ps -ax | wc -l
+h br/
+
+
+echo CPU Usage:
+if ( $uname == Darwin ) then
+	top -l 1 | awk '/CPU usage/{print}'
+else
+	top -bn1 | awk '/^%Cpu/{printf "%.1f%% used\n", 100-$8}'
+endif
+h br/
+
+
+# Ram
+
+# Load average
+
+# Throttling / Under-voltage (Pi-specific)
+# bashvcgencmd get_throttled
+# # returns hex flags, 0x0 means all good
+# # 0x50005 means currently throttled + under-voltage
+
+# Bandwidth / Network
+# bashcat /proc/net/dev   # cumulative bytes per interface
+# # to get a rate, you read it twice with a sleep in between
+
+
+h /body /html
+
+exit
 
 if ( $?HEADER_Accept ) then
 	if ( $HEADER_Accept:q == application/json ) then
 		header Content-Type application/json
 
-		echo '{"num_procs:"'"$num_procs"'}'
+		printf '{"num_procs":%d' $Num_Procs
+		if ( $?Temp_f ) then
+			printf ',"temp_f":%d' $Num_Procs
+			printf  -n ',"temp":'$Temp_f
 		exit
 	endif
 endif
@@ -22,7 +167,7 @@ h DOCTYPE html [ \
 		table -aborder=1 -acellpadding=10 -acellspacing=0 [ \
 			thead [ th -t Metric -t Value ] \
 			tbody [ \
-				tr [ td -t "Num Procs" -t "$num_procs" ] \
+				tr [ td -t "Num Procs" -t "$Num_Procs" ] \
 				tr [ td -t "another field" -t "foobar" ] \
 			] \
 		] \

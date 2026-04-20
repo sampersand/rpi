@@ -1,44 +1,55 @@
 #!/bin/dash
+
 set -euC
 
 readonly RS=$(printf '\036') US=$(printf '\037') TAB=$(printf '\t')
+# readonly RS=$(printf '\036') US=$(printf ':') TAB=$(printf '\t')
 
 : ${COMPACT=} # If supplied, `COMPACT` will remove unneeded whitesapce
 
 push_element () {
-	element_stack=$element_stack$RS$current_element$US$current_attributes
+	stack=$stack$RS$current_element$US$current_attributes$US$indent$US$newline
 	current_element=
 	current_attributes=
 	indent=$indent$TAB
 }
 
 pop_element () {
-	tmp=${element_stack##*$RS}
-	current_element=${tmp%%$US*}
-	current_attributes=${tmp##*$US}
-	element_stack=${element_stack%$RS*};
-	indent=${indent%?}
+	tmp=${stack##*$RS}
+	stack=${stack%$RS*}
+
+	IFS=$US
+	set -f
+	set -- $tmp
+	set +f
+	unset IFS
+	current_element=$1
+	current_attributes=$2
+	indent=$3
+	newline=$4
 }
 
 print_current_element () {
 	[ $COMPACT ] || printf '%s' "$indent"
-	[ "$current_element" = @ ] && return
-	if [ "${1-}" = / ]; then
-		printf '</%s>' "$current_element"
-	elif [ "$current_element" = DOCTYPE ]; then
-		header Content-Type text/html
-		printf '<!DOCTYPE html>'
-	else
-		printf '<%s%s%s>' "$current_element" "${current_attributes:+ }" "$current_attributes"
+	if [ "$current_element" != @ ]; then
+		if [ "${1-}" = / ]; then
+			printf '</%s>' "$current_element"
+		elif [ "$current_element" = DOCTYPE ]; then
+			header Content-Type text/html
+			printf '<!DOCTYPE html>'
+		else
+			printf '<%s%s%s>' "$current_element" "${current_attributes:+ }" "$current_attributes"
+		fi
 	fi
-	[ $COMPACT ] || [ "${2-}" = no_newline ] || echo
+	[ $COMPACT ] || [ "${2-}" = no_newline ] || [ -z "$newline" ] || echo
 }
 
-element_stack=
+stack=
 current_element=
 current_attributes=
 was_printed=
 indent=''
+newline=1
 run_program () {
 	while [ $# -ne 0 ]; do
 		case $1 in
@@ -51,9 +62,9 @@ run_program () {
 			push_element
 			run_program "$@"
 			shift $(( $# - $REPLY ))
-			# p "before popping, current element is: $element_stack"
+			# p "before popping, current element is: $stack"
 			pop_element
-			# p "after popping, current element is: $element_stack $current_element"
+			# p "after popping, current element is: $stack $current_element"
 			print_current_element /
 			was_printed=1
 			;;
@@ -63,7 +74,7 @@ run_program () {
 			break ;;
 		-*)
 			OPTIND=1 # we reset it each time
-			getopts 't:Ta:Anx:' opt # get the options
+			getopts 't:Ta:AnNx:' opt # get the options
 
 			# Support chaining multiple options
 			if [ -z "${OPTARG+x}" ]; then # if no argument is supplied
@@ -86,9 +97,9 @@ run_program () {
 			x)
 				indent=$(xx -c $OPTARG "$TAB") ;;
 			n)
-				current_newline= ;; # TODO
+				newline= ;;
 			N)
-				current_newline=1 ;;
+				newline=1 ;;
 			A)
 				current_attributes= ;;
 			a)
@@ -127,4 +138,9 @@ run_program () {
 	fi
 }
 
+
+if [ $1 = -C ]; then
+	shift
+	COMPACT=1
+fi
 run_program "$@"

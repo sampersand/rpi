@@ -1,6 +1,6 @@
 #!r49
 
-def p(x) printf($stderr, "%s\n", x._inspect); $stderr.flush end
+load('utils.r49')
 
 $ENV['DEBUG'] && $DEBUG = 1
 $METHOD = $ENV['METHOD']

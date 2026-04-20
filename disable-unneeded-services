@@ -1,0 +1,19 @@
+sudo systemctl disable --now \
+  wireplumber \
+  pipewire \
+  pipewire-pulse \
+  cups \
+  cups-browsed \
+  ModemManager \
+  bluetooth \
+  mpris-proxy \
+  rpcbind \
+  nfs-blkmap \
+  xdg-permission-store
+
+systemctl --user disable --now \
+  wireplumber \
+  pipewire \
+  pipewire-pulse \
+  pipewire-pulse.socket \
+  mpris-proxy

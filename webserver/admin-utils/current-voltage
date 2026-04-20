@@ -1,0 +1,26 @@
+#!/usr/bin/env r49
+
+load('utils.r49')
+
+throttled_raw = system2_e('vcgencmd get_throttled')
+throttled_raw =~ /^throttled=/ || fail(sprintf("unable to get throttled (output bad: %s)", throttled_raw._inspect))
+
+$THROTTLED = $1.hex
+
+$\ = "\n"
+$, = ' '
+
+def check(bit, meaning)
+	if ($THROTTLED & (1 << bit)) != 0 then
+		print('Currently', meaning)
+	end
+
+	if ($THROTTLED & (1 << (bit + 16))) != 0 then
+		print('Historically', meaning)
+	end
+end
+
+check(0, 'Under-Voltage')
+check(1, 'Arm Freq Cap')
+check(2, 'Throttled')
+check(3, 'Soft Temp limit')
