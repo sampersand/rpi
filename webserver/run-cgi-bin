@@ -13,14 +13,15 @@ if ! test -d $WEBSERVER_ROOT; then
 fi
 
 #PATH=$PATH:$PWD/../old/copy/usr-bin
+export RUBYLIB=$RUBYLIB${RUBYLIB:+:}$WEBSERVER_ROOT/ruby-include
 
 Cr="`printf '\r.'`"; Cr="${Cr%.}"; readonly Cr
 
 # Parse the very first line
 {
 	read METHOD RawRequest _Rest
-	case $METHOD in *[![A-Z]]*)
-		status 501 'HTTPS not supported'
+	case $METHOD in *[!A-Z]*)
+		status 501 HTTPS not supported
 		exit
 	esac
 
