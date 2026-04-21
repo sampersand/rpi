@@ -1,6 +1,6 @@
 SAMPSHELL_REPO         = https://github.com/sampersand/sampshell
 R49_REPO               = https://github.com/sampersand/ruby-0.49
-LOCAL_INSTALL_LOCATION = /usr/local/bin/
+LOCAL_INSTALL_LOCATION = /usr/local/bin
 RUBY_049_CODE_DST      = ~/ruby-0.49-src
 SAMPSHELL_LOCATION     = ~/sampshell
 INSTALL_SYSTEM_DEP     = sudo apt-get install -y --
@@ -26,8 +26,7 @@ $(LOCAL_INSTALL_LOCATION)/p: | $(SAMPSHELL_LOCATION) ruby
 
 r49-clean:
 	-rm -rf -- $(RUBY_049_CODE_DST)
-	-sudo rm -f $(LOCAL_INSTALL_LOCATION)/r49
-	-sudo rm -rf $(R49_RUBYLIB_LOCATION)
+	-sudo rm -f $(LOCAL_INSTALL_LOCATION)/r49 $(R49_RUBYLIB_DST_LOCATION)
 
 # Entirely remove r49's source code before downloading
 r49-redownload:
