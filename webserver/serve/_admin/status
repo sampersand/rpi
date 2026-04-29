@@ -30,7 +30,7 @@ cat <<EOS
 EOS
 
 setenv INDENT 1
-h h1 -T "Status of the PI"
+h h1 -t "Status of the PI"
 
 ################################################################################
 #                                 Energy State                                 #
@@ -64,7 +64,7 @@ else
 	set Current_Voltage_Status = '🟡 Historical Problems'
 endif
 
-h h2 -T Energy State
+h h2 -t 'Energy State'
 table   Metric      Value                       Health : \
 	Temperature "${Temp_C}ºC / ${Temp_F}ºF" "$Temp_Status" \
 	Voltage     "$Current_Voltage"          "$Current_Voltage_Status" \
@@ -73,7 +73,7 @@ table   Metric      Value                       Health : \
 #                                    Timing                                    #
 ################################################################################
 
-h h2 -T Timing
+h h2 -t Timing
 table Metric Value : \
 	Uptime         "`uptime | cut -f1 -d, | sed 's/.*up/up/'`" \
 	'Current Time' "`date`"
@@ -120,7 +120,7 @@ else
 	set Disk_Space_Status = '🔴 Critical'
 endif
 
-h h2 -T Memory + Disk Usage
+h h2 -t 'Memory + Disk Usage'
 table Metric Value Health : \
 	'Memory Usage' "$Memory_Usage" "$Memory_Usage_Status" \
 	'CPU Usage' "$CPU_Usage" "$CPU_Usage_Status" \

@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+$*.each do |arg|
+  puts arg.tr('+',' ').gsub(/%(\h{2})/){ $1.to_i(16).chr }
+end

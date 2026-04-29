@@ -12,7 +12,7 @@ h -x$INDENT table
 h -x$INDENT1 thead
 @ amnt = 0
 while ( $1:q != : )
-	h -x$INDENT2 th -T $1:q
+	h -x$INDENT2 th -t "$1"
 	shift
 	@ amnt++
 end
@@ -23,7 +23,7 @@ while ( $#argv )
 	@ tmp = 0
 	h -x$INDENT2 tr
 	while ( $tmp < $amnt )
-		h -x$INDENT3 td -T $1
+		h -x$INDENT3 td -t "$1"
 		shift
 		@ tmp++
 	end

@@ -11,7 +11,7 @@ readonly UNAME=`uname`
 readonly TEMPERATURE_FILE=/sys/class/thermal/thermal_zone0/temp
 
 h DOCTYPE html head [ title -t status ] body
-h h1 -T "Status of the PI"
+h h1 -t "Status of the PI"
 
 h table -a border=1 -a cellpadding=10 -a cellspacing=0 \
 	thead [ tr [ th -t{Metric,Value,Status} ] ] \

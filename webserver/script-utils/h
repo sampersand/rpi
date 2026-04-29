@@ -23,10 +23,10 @@ pop_element () {
 	set -- $tmp
 	set +f
 	unset IFS
-	current_element=$1
-	current_attributes=$2
-	indent=$3
-	newline=$4
+	current_element=${1-}
+	current_attributes=${2-}
+	indent=${3-}
+	newline=${4-}
 }
 
 print_current_element () {
@@ -38,10 +38,10 @@ print_current_element () {
 			header Content-Type text/html
 			printf '<!DOCTYPE html>'
 		else
-			printf '<%s%s%s>' "$current_element" "${current_attributes:+ }" "$current_attributes"
+			printf '<%s%s>' "$current_element" "${current_attributes:+ $current_attributes}"
 		fi
 	fi
-	[ $COMPACT ] || [ "${2-}" = no_newline ] || [ -z "$newline" ] || echo
+	[ $COMPACT ] || [ "${2-}" = no_newline ] || [ ! $newline ] || echo
 }
 
 stack=
@@ -74,24 +74,19 @@ run_program () {
 			break ;;
 		-*)
 			OPTIND=1 # we reset it each time
-			getopts 't:Ta:AnNx:' opt # get the options
+			getopts 't:T:a:AnNx:' opt # get the options
 
-			# Support chaining multiple options
-			if [ -z "${OPTARG+x}" ]; then # if no argument is supplied
+			# Support chaining multiple options, if no argument is supplied
+			case $opt in
+			[AnN])
 				case $1 in
 				-?) shift ;; # just delete it
 				-?*) tmp=$1; shift; set -- "-${tmp#-?}" "$@" ;;
 				*) echo "bad first arg: $1 (bug)" >&2; exit 2
-				esac
-			else
+				esac ;;
+			*)
 				shift $(( $OPTIND - 1 )) # delete the flag and its value
-			fi
-
-			if [ $opt = "T" ]; then
-				opt=t
-				OPTARG="$*"
-				shift $#
-			fi
+			esac
 
 			case $opt in
 			x)
@@ -104,6 +99,11 @@ run_program () {
 				current_attributes= ;;
 			a)
 				current_attributes=$current_attributes${current_attributes:+ }$OPTARG ;;
+			T)
+				current_element=@ print_current_element '' no_newline
+				printf '%s' "$OPTARG"
+				[ $COMPACT ] || [ ! $newline ] || echo
+				;;
 			t)
 				print_current_element '' no_newline
 				printf '%s' "$OPTARG"
