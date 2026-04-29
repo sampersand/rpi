@@ -1,0 +1,28 @@
+#!/bin/sh
+
+if [ $METHOD = POST ]; then
+  echo 'oops'
+  exit 2
+fi
+
+
+echo '<!DOCTYPE html>
+<html>
+<body>
+
+<h1>Run Knight!</h1>
+
+<form method="POST" action="/run">
+  <textarea name="code" rows="10" cols="60"></textarea>
+  <br>
+  <button type="submit">Submit</button>
+</form>
+
+<h3>stdout</h3>
+<tt id="stdout"></tt>
+
+<h3>Exit status</h3>
+<tt id="exit-status"></tt>
+
+</body>
+</html>'
