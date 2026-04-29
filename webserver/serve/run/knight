@@ -1,50 +1,6 @@
 #!/bin/dash
-set -e
 
-if [ $METHOD = POST ]; then
-  StderrFile=$(mktemp)
-
-  set -a -- "$(cat)"
-  . extract-url-encoding
-  set +ae
-  stdout=$(knight -e "$code" 2>$StderrFile)
-  exit_status=$?
-  set -e
-  stderr=$(cat "$StderrFile")
-  rm "$StderrFile"
-fi
-
-: ${code:='; OUTPUT "HELLO, \"
+exec ${0%/*}/_language.noserve 'knight -e' Knight \
+'; OUTPUT "HELLO, \"
 ; = place | ($ "printenv place | tr -d '\''\n'\''") "world"
 : OUTPUT + place "!"'}
-
-printf %s "<!DOCTYPE html>
-<html>
-<body>
-
-<h1>Run Knight!</h1>
-<form method=POST action=\"/run/knight${QUERY_STRING:+?$QUERY_STRING}\">
-  <textarea name=code rows=10 cols=60 style='font-family: monospace'>$code</textarea>
-  <br>
-  <button type=submit>Submit</button>
-</form>
-<div> Note: You can access query params as environment variables.
-Try connecting to <tt>$REQUEST_PATH?place=world</tt>
-
-<hr/>"
-
-if [ $METHOD = POST ]
-then
-  test $exit_status -ne 0 && h -T 'Exit Status:' tt -t $exit_status
-
-  test ${#stderr} -ne 0 && {
-    h h3 -t stderr
-    COMPACT=1 h pre [ tt -t "$stderr" ]
-  }
-  test ${#stdout} -ne 0 && {
-    h h3 -t stdout
-    COMPACT=1 h pre [ tt -t "$stdout" ]
-  }
-fi
-
-h /body /html

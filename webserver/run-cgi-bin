@@ -19,16 +19,15 @@ Cr="`printf '\r.'`"; Cr="${Cr%.}"; readonly Cr
 
 # Parse the very first line
 {
-	read METHOD RawRequest _Rest
+	read METHOD RAW_REQUEST _Rest
 	case $METHOD in *[!A-Z]*)
 		status 501 HTTPS not supported
 		exit
 	esac
 
-	export METHOD
-	export REQUEST_PATH="${RawRequest%%\?*}"
-	case $RawRequest in *\?*)
-		export QUERY_STRING=${RawRequest#"$REQUEST_PATH"\?}
+	export METHOD RAW_REQUEST REQUEST_PATH="${RAW_REQUEST%%\?*}"
+	case $RAW_REQUEST in *\?*)
+		export QUERY_STRING=${RAW_REQUEST#"$REQUEST_PATH"\?}
 
 		set -a -- "$QUERY_STRING"
 		. extract-url-encoding
@@ -69,7 +68,7 @@ if [ -e $Mux ]; then
 	Executable=$Mux
 fi
 
-if test ! -x $Executable; then
+if test ! -x $Executable || case $Executable in *.noserve) true;; *) false; esac; then
 	if test -f $Executable; then
 		warn got non-executable serve file: $Executable
 	fi

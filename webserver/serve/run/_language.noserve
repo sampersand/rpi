@@ -1,0 +1,55 @@
+#!/bin/dash
+set -e
+
+Executable=${1:?executable required}
+HumanReadableName=${2:?human readable name required}
+DefaultCode=${3?default code required}
+[ $# -ne 3 ] && { printf >&2 "$0: exactly 3 args are required\n"; exit 2 ; }
+
+if [ $METHOD = POST ]; then
+  StderrFile=$(mktemp)
+
+  set -a -- "$(cat)"
+  . extract-url-encoding
+  set +ae
+
+  stdout=$(eval $Executable '$code' 2>$StderrFile)
+  exit_status=$?
+  set -e
+fi
+
+: ${code=$DefaultCode}
+
+printf %s "<!DOCTYPE html>
+<html>
+<body>
+
+<h1>Run $HumanReadableName!</h1>
+<form method=POST action=\"$RAW_REQUEST\">
+  <textarea name=code rows=10 cols=60 style='font-family: monospace'>$code</textarea>
+  <br>
+  <button type=submit>Submit</button>
+</form>
+<div> Note: You can access query params as environment variables.
+Try connecting to <tt>$REQUEST_PATH?place=world</tt>
+
+<hr/>"
+
+if [ $METHOD = POST ]
+then
+  test $exit_status -ne 0 && h -T 'Exit Status:' tt -t $exit_status
+
+  test -s $StderrFile && {
+    h h3 -t stderr
+    COMPACT=1 h pre [ tt -f $StderrFile ]
+  }
+
+  rm $StderrFile
+
+  test ${#stdout} -ne 0 && {
+    h h3 -t stdout
+    COMPACT=1 h pre [ tt -t "$stdout" ]
+  }
+fi
+
+h /body /html

@@ -74,7 +74,7 @@ run_program () {
 			break ;;
 		-*)
 			OPTIND=1 # we reset it each time
-			getopts 't:T:a:AnNx:' opt # get the options
+			getopts 't:T:a:AnNx:f:F:' opt # get the options
 
 			# Support chaining multiple options, if no argument is supplied
 			case $opt in
@@ -99,14 +99,22 @@ run_program () {
 				current_attributes= ;;
 			a)
 				current_attributes=$current_attributes${current_attributes:+ }$OPTARG ;;
-			T)
+			[TF])
 				current_element=@ print_current_element '' no_newline
-				printf '%s' "$OPTARG"
+				if [ $opt = F ]; then
+					cat -- "$OPTARG"
+				else
+					printf %s "$OPTARG"
+				fi
 				[ $COMPACT ] || [ ! $newline ] || echo
 				;;
-			t)
+			[tf])
 				print_current_element '' no_newline
-				printf '%s' "$OPTARG"
+				if [ $opt = f ]; then
+					cat -- "$OPTARG"
+				else
+					printf %s "$OPTARG"
+				fi
 				indent= print_current_element '/'
 				was_printed=1
 				;;

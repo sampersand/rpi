@@ -1,0 +1,4 @@
+#!/bin/sh
+
+exec ${0%/*}/_language.noserve 'r49 -e' 'Ruby 0.49' \
+  'print("HELLO, ", $ENV["place"] || "world", "!\n")'
