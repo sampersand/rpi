@@ -144,7 +144,7 @@ void pop_stack(void) {
  **************************************************************************************************/
 
 int getopt_possibly_long(void) {
-#ifdef HAS_GETOPT_LONG1
+#ifdef HAS_GETOPT_LONG
 	// TODO
 	static struct option longopts[] = {
 	    { "text",           required_argument,  NULL,   't' },
@@ -159,7 +159,7 @@ int getopt_possibly_long(void) {
 	    { NULL,             0,                  NULL,    0  },
 	};
 
-	return getopt_long(argc, argv, "t:T:a:AnNx:f:F:", longopts, NULL);
+	return getopt_long(argc, argv, "+t:T:a:AnNx:f:F:", longopts, NULL);
 #else
 	return getopt(argc, argv, "t:T:a:AnNx:f:F:");
 #endif
@@ -258,7 +258,17 @@ enum status run_program(void) {
 			break;
 
 		case 'x':
-			current_element.indent = atoi(optarg);
+			// You can specify `-x +10` to increment by 10, or `-x +` to just increase 1
+			switch (optarg[0]) {
+			case '+':
+				current_element.indent += optarg[1] ? atoi(optarg + 1) : 1;
+				break;
+			case '-':
+				current_element.indent -= optarg[1] ? atoi(optarg + 1) : 1;
+				break;
+			default:
+				current_element.indent = atoi(optarg);
+			}
 			break;
 
 		case 'A':
