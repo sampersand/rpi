@@ -93,7 +93,6 @@ int run_program(int argc, argv_t argv) {
 
 	while ( optind <= argc ) {
 		opt = getopt(argc, argv, "t:T:a:AnNx:f:F:");
-		// printf("got opt [optind=%d, %d]: %c (%d)\n", optind, argc, opt, opt);
 
 		switch (opt) {
 		case -1:
@@ -103,6 +102,13 @@ int run_program(int argc, argv_t argv) {
 
 			if (!strcmp(nonflag_arg, "]")) {
 				return 0;
+			}
+
+			if (!strcmp(nonflag_arg, "[]")) {
+				print_current_element(OPENING_ELE, TRAILING_NEWLINE, INDENT);
+				print_current_element(CLOSING_ELE, TRAILING_NEWLINE, INDENT);
+				was_printed = true;
+				break;
 			}
 
 			if (!strcmp(nonflag_arg, "[")) {
@@ -203,7 +209,7 @@ int main(int argc, argv_t argv) {
 	program_name = argv[0];
 	// char * const other_argv[] = { argv[0], "-n", "div", "-t", "foobar", "br", "-Tbaz", "quux", 0 };
 	// char * const other_argv[] = { argv[0], "p", "-ax", "-ay", "-ta", "-tb", 0 };
-	char * const other_argv[] = { argv[0], "div", "[", "-n", "p", "-tfoo", "-N", "]", 0 };
+	char * const other_argv[] = { argv[0], "div", "[]", "p", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
 	if (argc == 1) {
 		argc = sizeof(other_argv) / sizeof(char*) - 1; // / sizeof(char *);
 		argv = other_argv;
