@@ -4,61 +4,69 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <errno.h>
 
-bool compact = false;
-const char *program_name;
+#ifndef HAS_GETOPT_LONG
+# if defined(_GNU_SOURCE) || defined(__GNU_LIBRARY__) || defined(__GLIBC__) /* glibc (Linux) */ \
+  || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__) /* BSDs */ \
+  || defined(__APPLE__)/* macOS */
+# define HAS_GETOPT_LONG
+# endif
+#elif HAS_GETOPT_LONG == 0
+# undef HAS_GETOPT_LONG
+#endif
 
-#define die(...) (fprintf(stderr, __VA_ARGS__), exit(1))
+/**************************************************************************************************
+ *                             Global Variables and Helper Functions                              *
+ **************************************************************************************************/
+
+// Controlled by the `COMPACT` env var. If set, no extraneous whitespace is printed
+bool compact;
+
+// The `argc` and `argv` from `main()` (set here so others can use them)
+int argc;
+char *const *argv;
+
+// Aborts with a usage message
+#define die(...) do { fprintf(stderr, "%s: ", argv[0]), \
+				  fprintf(stderr, __VA_ARGS__), \
+				  fputc('\n', stderr), \
+				  exit(1); } while (0)
+
+// Prints a file to stdout, aborting if there's a problem
+void cat_file(const char *file) {
+    FILE *f = fopen(file, "r");
+    if (!f)
+    	die("cannot cat %s: %s", file, strerror(errno));
+
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
+        fwrite(buf, 1, n, stdout);
+
+    fclose(f);
+}
+
+/**************************************************************************************************
+ *                                         HTML Elements                                          *
+ **************************************************************************************************/
 
 // An HTML element
 struct element {
-	const char *name; // The name of the element (eg `h1`, `div`, etc)
-	char *attributes; // Attributes for the element (eg `lang=html`, `style: ...`, etc)
-	unsigned indent;  // How deeply indented the element is
-	bool no_newline;  // whether a trailing newline should be printed
+	const char *name;      // The name of the element (eg `h1`, `div`, etc)
+	char *attributes;      // Attributes for the element (`style=`, `href=`, ...). malloc'd.
+	unsigned short indent; // How deeply indented the element is
+	bool no_newline;       // whether a trailing newline should be printed
 };
 
-#ifndef ELEMENT_STACK_SIZE
-# define ELEMENT_STACK_SIZE 10000
-#endif
-struct element element_stack[ELEMENT_STACK_SIZE];
-unsigned element_stack_len = 0;
-#define current_element (element_stack[element_stack_len])
 
-void set_current_element(const char *name) {
-	// TODO: free old `attributes`
-	current_element.name = name;
-	free(current_element.attributes);
-	current_element.attributes = NULL;
-}
-
-void push_element(void) {
-	unsigned old_indent = current_element.indent;
-	if (element_stack_len++ > ELEMENT_STACK_SIZE) {
-		fprintf(stderr, "%s: too many nested `[` encountered (%d max)", program_name, ELEMENT_STACK_SIZE);
-		exit(2);
-	}
-	set_current_element(NULL);
-	current_element.indent = old_indent + 1;
-}
-
-void pop_element(void) {
-	assert(element_stack_len);
-	free(current_element.attributes);
-	--element_stack_len;
-}
-
-#define print_current_element(...) print_element(&current_element, __VA_ARGS__)
-
-enum closing { OPENING_ELE, CLOSING_ELE };
-enum newline { NO_TRAILING_NEWLINE, TRAILING_NEWLINE };
-enum indent { NO_INDENT, INDENT };
-
+// Prints a newline for the element unless the element has disabled newlines
 void print_newline(const struct element *ele) {
 	if (compact) return;
 	if (!ele->no_newline) putchar('\n');
 }
 
+// Prints the leading indentation for the element
 void print_indent(const struct element *ele) {
 	if (compact) return;
 
@@ -66,7 +74,12 @@ void print_indent(const struct element *ele) {
 		putchar('\t');
 }
 
+enum closing { OPENING_ELE, CLOSING_ELE };
+enum newline { NO_TRAILING_NEWLINE, TRAILING_NEWLINE };
+enum indent { NO_INDENT, INDENT };
+#define print_current_element(...) print_element(&current_element, __VA_ARGS__)
 void print_element(const struct element *ele, enum closing closing, enum newline newline, enum indent indent) {
+	assert(ele->name);
 	if (indent == INDENT) print_indent(ele);
 
 	if (strcmp(ele->name, "@")) {
@@ -85,47 +98,150 @@ void print_element(const struct element *ele, enum closing closing, enum newline
 	if (newline == TRAILING_NEWLINE) print_newline(ele);
 }
 
-typedef char *const *argv_t;
+/**************************************************************************************************
+ *                                       The Element Stack                                        *
+ **************************************************************************************************/
 
-int run_program(int argc, argv_t argv) {
+// The element stack. This is used when nesting elements via `[ ... ]`, eg `div [ span [ ... ] ]`
+#ifndef ELEMENT_STACK_SIZE
+# define ELEMENT_STACK_SIZE 10000
+#endif
+struct element element_stack[ELEMENT_STACK_SIZE];
+unsigned element_stack_len = 0;
+#define current_element (element_stack[element_stack_len])
+
+static bool has_current_element(void) {
+	return current_element.name != NULL;
+}
+
+// Overwrites the current element with a new one
+void set_current_element(const char *name) {
+	current_element.name = name;
+	free(current_element.attributes); // NOTE: this is OK even when `attributes` are null.
+	current_element.attributes = NULL;
+}
+
+// Pushes the current stack, adding a new element on top. Used by `[`.
+void push_stack(void) {
+	unsigned short old_indent = current_element.indent;
+	if (element_stack_len++ > ELEMENT_STACK_SIZE) {
+		die("too many nested `[` encountered (%d max)", ELEMENT_STACK_SIZE);
+	}
+
+	set_current_element(NULL);
+	current_element.indent = old_indent + 1;
+}
+
+// Clears the current element from the top of the stack
+void pop_stack(void) {
+	assert(element_stack_len);
+	free(current_element.attributes); // make sure we don't have dangling memory
+	--element_stack_len;
+}
+
+/**************************************************************************************************
+ *                                          Program Loop                                          *
+ **************************************************************************************************/
+
+int getopt_possibly_long(void) {
+#ifdef HAS_GETOPT_LONG1
+	// TODO
+	static struct option longopts[] = {
+	    { "text",           required_argument,  NULL,   't' },
+	    { "inline-text",    required_argument,  NULL,   'T' },
+	    { "attribute",      required_argument,  NULL,   'a' },
+	    { "clear-attribute",no_argument,        NULL,   'A' },
+	    { "no-newline",     no_argument,        NULL,   'n' },
+	    { "newline",        no_argument,        NULL,   'N' },
+	    { "indent",         required_argument,  NULL,   'x' },
+	    { "include-file",   required_argument,  NULL,   'f' },
+	    { "inline-file",    required_argument,  NULL,   'F' },
+	    { NULL,             0,                  NULL,    0  },
+	};
+
+	return getopt_long(argc, argv, "t:T:a:AnNx:f:F:", longopts, NULL);
+#else
+	return getopt(argc, argv, "t:T:a:AnNx:f:F:");
+#endif
+}
+
+enum status {
+	NO_MORE_OPTIONS,
+	END_NESTED_ELEMENT
+};
+
+enum status run_program(void) {
 	int opt;
 	bool was_printed = false;
+	char *nonflag_arg;
+	enum status status = NO_MORE_OPTIONS;
 
-	while ( optind <= argc ) {
-		opt = getopt(argc, argv, "t:T:a:AnNx:f:F:");
+	// Loop while there's still stuff left to be read.
+	while ( optind < argc ) {
+		// Fetch the current option.
+		//
+		// We have a Frankenstein-esque approach to using `getopt` here, where instead of just
+		// parsing all options up front, we instead use non-option values as HTML elements, and then
+		// flags modify those HTML elements.
+		switch ((opt = getopt_possibly_long())) {
 
-		switch (opt) {
+		// An option of `-1` means "end of option parsing"--either because we're at the end of
+		// argv, or because a non-option arg was encountered
 		case -1:
-			;
-			char *nonflag_arg = argv[optind++];
-			if (!nonflag_arg) goto done;
+			// Extract the arg, and increment `optind` by one, so that the next time `getopt`
+			// runs, we don't see the same option.
+			nonflag_arg = argv[optind++];
 
-			if (!strcmp(nonflag_arg, "]")) {
-				return 0;
+			// If it's NULL, that means we're at end of argument parsing.
+			if (!nonflag_arg) {
+				status = NO_MORE_OPTIONS;
+				goto done;
 			}
 
-			if (!strcmp(nonflag_arg, "[]")) {
-				print_current_element(OPENING_ELE, TRAILING_NEWLINE, INDENT);
-				print_current_element(CLOSING_ELE, TRAILING_NEWLINE, INDENT);
-				was_printed = true;
-				break;
-			}
+			/******************************************************************
+			 *                 Nested HTML Element Arguments                  *
+			 ******************************************************************/
 
+			// An `[` begins a nested group; we print out an opening tag,
+			// then all elements until a matching `]` are printed out, then a
+			// closing tag.
 			if (!strcmp(nonflag_arg, "[")) {
+				if (!has_current_element())
+					die("cannot nest when there's no active element");
 				print_current_element(OPENING_ELE, TRAILING_NEWLINE, INDENT);
-				push_element();
-				unsigned len = element_stack_len;
-				run_program(argc, argv);
-				if ( element_stack_len != len ) {
-					die("mismatched `[`s for %s\n", current_element.name);
-				}
-				pop_element();
+
+				push_stack();
+				enum status child_status = run_program();
+				pop_stack();
+
+				if (child_status != END_NESTED_ELEMENT)
+					die("missing closing ] for %s", current_element.name);
 				print_current_element(CLOSING_ELE, TRAILING_NEWLINE, INDENT);
 				was_printed = true;
 				break;
 			}
 
-			if (current_element.name && !was_printed) {
+			// If we encounter a `]`, that's the end of a nested group.
+			if (!strcmp(nonflag_arg, "]")) {
+				status = END_NESTED_ELEMENT;
+				goto done;
+			}
+
+			// An `[]` just prints out an empty body. Short-hand for `[ ]`
+			if (!strcmp(nonflag_arg, "[]")) {
+				if (!has_current_element())
+					die("cannot nest when there's no active element");
+				print_current_element(OPENING_ELE, TRAILING_NEWLINE, INDENT);
+				print_current_element(CLOSING_ELE, TRAILING_NEWLINE, INDENT);
+				was_printed = true;
+				break;
+			}
+
+			/******************************************************************
+			 *                        Normal HTML Tags                        *
+			 ******************************************************************/
+
+			if (has_current_element() && !was_printed) {
 				print_current_element(OPENING_ELE, TRAILING_NEWLINE, INDENT);
 			}
 
@@ -162,28 +278,25 @@ int run_program(int argc, argv_t argv) {
 			}
 			break;
 
-		case 'F': die("todo");
+		case 'F':
 		case 'T':
 			print_indent(&current_element);
 			if (opt == 'F') {
-				die("todo");
+				cat_file(optarg);
 			} else {
 				fputs(optarg, stdout);
 			}
 			print_newline(&current_element);
-				// current_element=@ print_current_element '' no_newline
-				// if [ $opt = F ]; then
-				// 	cat -- "$OPTARG"
-				// else
-				// 	printf %s "$OPTARG"
-				// fi
-				// [ $COMPACT ] || [ ! $newline ] || echo
+			break;
 
-		case 'f': die("todo");
+		case 'f':
 		case 't':
+			if (!has_current_element())
+				die("cannot print embedded text when there is no active element; try -T instead?");
+
 			print_current_element(OPENING_ELE, NO_TRAILING_NEWLINE, INDENT);
 			if (opt == 'f') {
-				die("todo");
+				cat_file(optarg);
 			} else {
 				fputs(optarg, stdout);
 			}
@@ -194,25 +307,40 @@ int run_program(int argc, argv_t argv) {
 			break;
 
         case '?':
-			die("todo: bad options %c", opt);
+        	exit(1);
+
+		default:
+			die("bug, unknown option %d", opt);
 		}
 	}
+
 done:
-	if ( current_element.name && ! was_printed ) {
+
+	if ( has_current_element() && ! was_printed ) {
 		print_current_element(OPENING_ELE, TRAILING_NEWLINE, INDENT);
 	}
 
-	return 0;
+	return status;
 }
 
-int main(int argc, argv_t argv) {
-	program_name = argv[0];
+int main(int argc_, char *const argv_[]) {
+	argc = argc_;
+	argv = argv_;
+
+	// Initial environment variable setup
+	compact = getenv("COMPACT") != NULL;
+	char *indent = getenv("INDENT");
+	current_element.indent = indent ? atoi(indent) : 0;
+
 	// char * const other_argv[] = { argv[0], "-n", "div", "-t", "foobar", "br", "-Tbaz", "quux", 0 };
 	// char * const other_argv[] = { argv[0], "p", "-ax", "-ay", "-ta", "-tb", 0 };
-	char * const other_argv[] = { argv[0], "div", "[]", "p", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
+	// char * const other_argv[] = { argv[0], "div", "[]", "p", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
+	char * const other_argv[] = { argv[0], "div", "[", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
 	if (argc == 1) {
 		argc = sizeof(other_argv) / sizeof(char*) - 1; // / sizeof(char *);
 		argv = other_argv;
 	}
-	return run_program(argc, argv);
+
+	if (run_program() == END_NESTED_ELEMENT)
+		die("stray ] encountered");
 }
