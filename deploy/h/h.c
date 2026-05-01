@@ -20,8 +20,23 @@
  *                             Global Variables and Helper Functions                              *
  **************************************************************************************************/
 
+const char *inline_elements[] = {
+    "a", "abbr", "acronym", "b", "bdi", "bdo", "big", "button",
+    "cite", "code", "em", "i", "kbd", "label", "mark", "q",
+    "s", "samp", "select", "small", "span", "strong", "sub", "sup",
+    "textarea", "time", "u", "var", NULL
+};
+
+bool needs_trailing_whitesapce(const char *str) {
+	if (str == NULL) return false;
+	for (const char *p = inline_elements[0]; *p; ++p)
+		if (!strcmp(str, p)) return true;
+	return false;
+}
+
 // Controlled by the `COMPACT` env var. If set, no extraneous whitespace is printed
 bool compact;
+int inline_mode;
 
 // The `argc` and `argv` from `main()` (set here so others can use them)
 int argc;
@@ -57,29 +72,43 @@ struct element {
 	char *attributes;      // Attributes for the element (`style=`, `href=`, ...). malloc'd.
 	unsigned short indent; // How deeply indented the element is
 	bool no_newline;       // whether a trailing newline should be printed
+	int element_number;
+	bool previous_needs_whitespace;
 };
 
+static bool has_current_element(void);
 
 // Prints a newline for the element unless the element has disabled newlines
 void print_newline(const struct element *ele) {
-	if (compact) return;
-	if (!ele->no_newline) putchar('\n');
+	if (!compact) {
+		if (!ele->no_newline) putchar('\n');
+	}
 }
 
 // Prints the leading indentation for the element
-void print_indent(const struct element *ele) {
-	if (compact) return;
+void print_indent(struct element *ele) {
+	if (inline_mode) {
+		inline_mode = false;
+		return;
+	}
 
-	for (unsigned i = 0; i < ele->indent; ++i)
-		putchar('\t');
+	if (compact) {
+		if (ele->previous_needs_whitespace)
+			putchar(' ');
+	} else {
+		for (unsigned i = 0; i < ele->indent; ++i)
+			putchar('\t');
+	}
 }
 
 enum closing { OPENING_ELE, CLOSING_ELE };
 enum newline { NO_TRAILING_NEWLINE, TRAILING_NEWLINE };
 enum indent { NO_INDENT, INDENT };
 #define print_current_element(...) print_element(&current_element, __VA_ARGS__)
-void print_element(const struct element *ele, enum closing closing, enum newline newline, enum indent indent) {
+void print_element(struct element *ele, enum closing closing, enum newline newline, enum indent indent) {
 	assert(ele->name);
+	// printf("[%d]", ele->	element_number);
+	ele->element_number++;
 	if (indent == INDENT) print_indent(ele);
 
 	if (strcmp(ele->name, "@")) {
@@ -116,6 +145,9 @@ static bool has_current_element(void) {
 
 // Overwrites the current element with a new one
 void set_current_element(const char *name) {
+	if (current_element.name)
+		current_element.previous_needs_whitespace = needs_trailing_whitesapce(current_element.name);
+
 	current_element.name = name;
 	free(current_element.attributes); // NOTE: this is OK even when `attributes` are null.
 	current_element.attributes = NULL;
@@ -130,6 +162,8 @@ void push_stack(void) {
 
 	set_current_element(NULL);
 	current_element.indent = old_indent + 1;
+	current_element.element_number = 0;
+	current_element.previous_needs_whitespace = false;
 }
 
 // Clears the current element from the top of the stack
@@ -156,12 +190,13 @@ int getopt_possibly_long(void) {
 	    { "indent",         required_argument,  NULL,   'x' },
 	    { "include-file",   required_argument,  NULL,   'f' },
 	    { "inline-file",    required_argument,  NULL,   'F' },
+	    { "inline",         no_argument,        NULL,   'i' },
 	    { NULL,             0,                  NULL,    0  },
 	};
 
-	return getopt_long(argc, argv, "+t:T:a:AnNx:f:F:", longopts, NULL);
+	return getopt_long(argc, argv, "+t:T:a:AnNix:f:F:", longopts, NULL);
 #else
-	return getopt(argc, argv, "t:T:a:AnNx:f:F:");
+	return getopt(argc, argv, "t:T:a:AnNix:f:F:");
 #endif
 }
 
@@ -175,9 +210,13 @@ enum status run_program(void) {
 	bool was_printed = false;
 	char *nonflag_arg;
 	enum status status = NO_MORE_OPTIONS;
+	// int inline_mode = 0;
 
 	// Loop while there's still stuff left to be read.
-	while ( optind < argc ) {
+	while ( 1 ) {
+		inline_mode = false;
+	top:
+		if (!(optind < argc)) break;
 		// Fetch the current option.
 		//
 		// We have a Frankenstein-esque approach to using `getopt` here, where instead of just
@@ -249,6 +288,10 @@ enum status run_program(void) {
 			was_printed = false;
 			break;
 
+		case 'i':
+			inline_mode = true;
+			goto top;
+
 		case 'n':
 			current_element.no_newline = true;
 			break;
@@ -290,13 +333,21 @@ enum status run_program(void) {
 
 		case 'F':
 		case 'T':
+			// if (!inline_mode && has_current_element()) {
+			// 	putchar('_');
+			// }
+			current_element.element_number++;
 			print_indent(&current_element);
+			current_element.previous_needs_whitespace = true;
 			if (opt == 'F') {
 				cat_file(optarg);
 			} else {
 				fputs(optarg, stdout);
 			}
 			print_newline(&current_element);
+			// if (!inline_mode && !has_current_element()) {
+			// 	putchar('@');
+			// }
 			break;
 
 		case 'f':
@@ -345,8 +396,9 @@ int main(int argc_, char *const argv_[]) {
 	// char * const other_argv[] = { argv[0], "-n", "div", "-t", "foobar", "br", "-Tbaz", "quux", 0 };
 	// char * const other_argv[] = { argv[0], "p", "-ax", "-ay", "-ta", "-tb", 0 };
 	// char * const other_argv[] = { argv[0], "div", "[]", "p", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
-	char * const other_argv[] = { argv[0], "div", "[", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
+	char * const other_argv[] = { argv[0], "-T", "a", "-T", "b", "-iT", "c", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
 	if (argc == 1) {
+		compact=1;
 		argc = sizeof(other_argv) / sizeof(char*) - 1; // / sizeof(char *);
 		argv = other_argv;
 	}
