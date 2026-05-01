@@ -73,18 +73,8 @@ struct element {
 	char *attributes;      // Attributes for the element (`style=`, `href=`, ...). malloc'd.
 	unsigned short indent; // How deeply indented the element is
 	bool no_newline;       // whether a trailing newline should be printed
-	int element_number;
 	bool previous_needs_whitespace;
 };
-
-static bool has_current_element(void);
-
-// Prints a newline for the element unless the element has disabled newlines
-void print_newline(const struct element *ele) {
-	// if (!compact) {
-	// 	if (!ele->no_newline) putchar('\n');
-	// }
-}
 
 // Prints the leading indentation for the element
 void print_indent(struct element *ele) {
@@ -106,26 +96,24 @@ void print_indent(struct element *ele) {
 }
 
 enum closing { OPENING_ELE, CLOSING_ELE };
-enum newline { NO_TRAILING_NEWLINE, TRAILING_NEWLINE };
 enum indent { NO_INDENT, INDENT };
 #define print_current_element(...) print_element(&current_element, __VA_ARGS__)
 void print_element(struct element *ele, enum closing closing, enum indent indent) {
 	assert(ele->name);
-	// printf("[%d]", ele->	element_number);
-	ele->element_number++;
-	if (indent == INDENT) print_indent(ele);
+	if (indent == INDENT)
+		print_indent(ele);
 
-	if (strcmp(ele->name, "@")) {
-		if (closing == CLOSING_ELE) {
-			printf("</%s>", ele->name);
-		} else if (!strcmp(ele->name, "DOCTYPE")) {
-			system("header Content-Type text/html"); // TODO: abort if this fails
-			fputs("<!DOCTYPE html>", stdout);
-		} else {
-			printf("<%s", ele->name);
-			if (ele->attributes) printf(" %s", ele->attributes);
-			putchar('>');
-		}
+	if (!strcmp(ele->name, "@")) return; // TODO: is this still useful?
+
+	if (closing == CLOSING_ELE) {
+		printf("</%s>", ele->name);
+	} else if (!strcmp(ele->name, "DOCTYPE")) {
+		system("header Content-Type text/html"); // TODO: abort if this fails
+		fputs("<!DOCTYPE html>", stdout);
+	} else {
+		printf("<%s", ele->name);
+		if (ele->attributes) printf(" %s", ele->attributes);
+		putchar('>');
 	}
 }
 
@@ -164,7 +152,6 @@ void push_stack(void) {
 
 	set_current_element(NULL);
 	current_element.indent = old_indent + 1;
-	current_element.element_number = 0;
 	current_element.previous_needs_whitespace = false;
 }
 
@@ -335,21 +322,10 @@ enum status run_program(void) {
 
 		case 'F':
 		case 'T':
-			// if (!inline_mode && has_current_element()) {
-			// 	putchar('_');
-			// }
-			current_element.element_number++;
 			print_indent(&current_element);
 			current_element.previous_needs_whitespace = true;
-			if (opt == 'F') {
-				cat_file(optarg);
-			} else {
-				fputs(optarg, stdout);
-			}
-			print_newline(&current_element);
-			// if (!inline_mode && !has_current_element()) {
-			// 	putchar('@');
-			// }
+			if (opt == 'F') cat_file(optarg);
+			else fputs(optarg, stdout);
 			break;
 
 		case 'f':
