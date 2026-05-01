@@ -1,8 +1,13 @@
 #!/usr/bin/env ruby
-require "minitest/autorun"
 
+$*.clear
 $* << __dir__ + '/h' if $*.empty?
+
 $exe = $*.shift or fail
+
+puts "running tests for: #{$exe}"
+
+require "minitest/autorun"
 
 class TestMath < Minitest::Test
   def assert_output(expected, args, chomp: true, compact: false)
@@ -13,6 +18,8 @@ class TestMath < Minitest::Test
       out.chomp! if chomp
       assert_equal expected, out
     end
+  rescue
+    binding.irb
   end
 
   def test_single_args
@@ -78,8 +85,11 @@ class TestMath < Minitest::Test
   end
 
   def test_compact
+    assert_output <<~EOS.chomp, %w[ div [ x y z ] ], compact: true
+    <div><x><y><z></div>
+    EOS
     assert_output <<~EOS.chomp, %w[ div [ a b c ] ], compact: true
-    <div><a><b><c></div>
+    <div><a> <b><c></div>
     EOS
 
     assert_output <<~EOS.chomp, %w[ div [ -T hello -T there -T world ] ], compact: true
@@ -91,6 +101,24 @@ class TestMath < Minitest::Test
     EOS
     assert_output <<~EOS.chomp, %W[ div [ -T hello strong -t there -iT ,\sworld! ] ], compact: true
     <div>hello <strong>there</strong>, world!</div>
+    EOS
+
+    assert_output <<~EOS.chomp, %w[ div [ -Thello -T w strong -itthere -t what -iT world q -i [ r ] ] span [ -T a -T b ] ], compact: true
+    <div>hello w<strong>there</strong> <strong>what</strong>world<q><r></q></div><span>a b</span>
+    EOS
+
+    assert_output <<~EOS.chomp, %w[ div [ -Thello -T w strong -itthere -t what -iT world q -i [ r ] ] span [ -T a -T b ] ], compact: false
+    <div>
+    \thello
+    \tw<strong>there</strong>
+    \t<strong>what</strong>world<q>
+    \t\t<r>
+    \t</q>
+    </div>
+    <span>
+    \ta
+    \tb
+    </span>
     EOS
   end
 end

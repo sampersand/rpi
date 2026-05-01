@@ -11,5 +11,5 @@ install:
 clean:
 	rm -f *.o $(EXE) /usr/local/bin/$(EXE)
 
-test:
+test: $(EXE)
 	./run-tests.rb $(EXE)

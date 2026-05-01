@@ -37,6 +37,7 @@ bool needs_trailing_whitesapce(const char *str) {
 // Controlled by the `COMPACT` env var. If set, no extraneous whitespace is printed
 bool compact;
 int inline_mode;
+bool is_very_first_element = true;
 
 // The `argc` and `argv` from `main()` (set here so others can use them)
 int argc;
@@ -80,9 +81,9 @@ static bool has_current_element(void);
 
 // Prints a newline for the element unless the element has disabled newlines
 void print_newline(const struct element *ele) {
-	if (!compact) {
-		if (!ele->no_newline) putchar('\n');
-	}
+	// if (!compact) {
+	// 	if (!ele->no_newline) putchar('\n');
+	// }
 }
 
 // Prints the leading indentation for the element
@@ -91,11 +92,14 @@ void print_indent(struct element *ele) {
 		inline_mode = false;
 		return;
 	}
-
 	if (compact) {
 		if (ele->previous_needs_whitespace)
 			putchar(' ');
 	} else {
+		if (is_very_first_element)
+			is_very_first_element = false;
+		else if (!ele->no_newline)
+			putchar('\n');
 		for (unsigned i = 0; i < ele->indent; ++i)
 			putchar('\t');
 	}
@@ -105,7 +109,7 @@ enum closing { OPENING_ELE, CLOSING_ELE };
 enum newline { NO_TRAILING_NEWLINE, TRAILING_NEWLINE };
 enum indent { NO_INDENT, INDENT };
 #define print_current_element(...) print_element(&current_element, __VA_ARGS__)
-void print_element(struct element *ele, enum closing closing, enum newline newline, enum indent indent) {
+void print_element(struct element *ele, enum closing closing, enum indent indent) {
 	assert(ele->name);
 	// printf("[%d]", ele->	element_number);
 	ele->element_number++;
@@ -123,8 +127,6 @@ void print_element(struct element *ele, enum closing closing, enum newline newli
 			putchar('>');
 		}
 	}
-
-	if (newline == TRAILING_NEWLINE) print_newline(ele);
 }
 
 /**************************************************************************************************
@@ -247,7 +249,7 @@ enum status run_program(void) {
 			if (!strcmp(nonflag_arg, "[")) {
 				if (!has_current_element())
 					die("cannot nest when there's no active element");
-				print_current_element(OPENING_ELE, TRAILING_NEWLINE, INDENT);
+				print_current_element(OPENING_ELE, INDENT);
 
 				push_stack();
 				enum status child_status = run_program();
@@ -255,7 +257,7 @@ enum status run_program(void) {
 
 				if (child_status != END_NESTED_ELEMENT)
 					die("missing closing ] for %s", current_element.name);
-				print_current_element(CLOSING_ELE, TRAILING_NEWLINE, INDENT);
+				print_current_element(CLOSING_ELE, INDENT);
 				was_printed = true;
 				break;
 			}
@@ -270,8 +272,8 @@ enum status run_program(void) {
 			if (!strcmp(nonflag_arg, "[]")) {
 				if (!has_current_element())
 					die("cannot nest when there's no active element");
-				print_current_element(OPENING_ELE, TRAILING_NEWLINE, INDENT);
-				print_current_element(CLOSING_ELE, TRAILING_NEWLINE, INDENT);
+				print_current_element(OPENING_ELE, INDENT);
+				print_current_element(CLOSING_ELE, INDENT);
 				was_printed = true;
 				break;
 			}
@@ -281,7 +283,7 @@ enum status run_program(void) {
 			 ******************************************************************/
 
 			if (has_current_element() && !was_printed) {
-				print_current_element(OPENING_ELE, TRAILING_NEWLINE, INDENT);
+				print_current_element(OPENING_ELE, INDENT);
 			}
 
 			set_current_element(nonflag_arg);
@@ -355,7 +357,7 @@ enum status run_program(void) {
 			if (!has_current_element())
 				die("cannot print embedded text when there is no active element; try -T instead?");
 
-			print_current_element(OPENING_ELE, NO_TRAILING_NEWLINE, INDENT);
+			print_current_element(OPENING_ELE, INDENT);
 			if (opt == 'f') {
 				cat_file(optarg);
 			} else {
@@ -363,7 +365,7 @@ enum status run_program(void) {
 			}
 
 			// TODO: should we have no indent? thats what the shell one did
-			print_current_element(CLOSING_ELE, TRAILING_NEWLINE, NO_INDENT);
+			print_current_element(CLOSING_ELE, NO_INDENT);
 			was_printed = true;
 			break;
 
@@ -378,7 +380,7 @@ enum status run_program(void) {
 done:
 
 	if ( has_current_element() && ! was_printed ) {
-		print_current_element(OPENING_ELE, TRAILING_NEWLINE, INDENT);
+		print_current_element(OPENING_ELE, INDENT);
 	}
 
 	return status;
@@ -396,7 +398,7 @@ int main(int argc_, char *const argv_[]) {
 	// char * const other_argv[] = { argv[0], "-n", "div", "-t", "foobar", "br", "-Tbaz", "quux", 0 };
 	// char * const other_argv[] = { argv[0], "p", "-ax", "-ay", "-ta", "-tb", 0 };
 	// char * const other_argv[] = { argv[0], "div", "[]", "p", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
-	char * const other_argv[] = { argv[0], "-T", "a", "-T", "b", "-iT", "c", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
+	char * const other_argv[] = { argv[0], "-Ta", "-Tb", "-iTc", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
 	if (argc == 1) {
 		compact=1;
 		argc = sizeof(other_argv) / sizeof(char*) - 1; // / sizeof(char *);
@@ -405,4 +407,6 @@ int main(int argc_, char *const argv_[]) {
 
 	if (run_program() == END_NESTED_ELEMENT)
 		die("stray ] encountered");
+
+	if (! compact) putchar('\n');
 }
