@@ -57,10 +57,9 @@ void cat_FILE(FILE *f, bool chomp_last) {
     int prev = -1;  // last byte of previous chunk, or -1 if none
 
     while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
-        if (prev != -1)
-            fwrite(&(char){prev}, 1, 1, stdout);  // flush held byte
+        if (prev != -1) fwrite(&(char){prev}, 1, 1, stdout);
         prev = (unsigned char)buf[n - 1];
-        fwrite(buf, 1, n - 1, stdout);             // write all but last byte
+        fwrite(buf, 1, n - 1, stdout);
     }
 
     // now prev holds the very last byte
@@ -81,6 +80,14 @@ void execute_command(const char *cmd) {
 	if (!p)
     	die("cannot execute %s: %s", cmd, strerror(errno));
    	cat_FILE(p, true);
+
+    int status = pclose(p);
+    if (status == -1)
+        die("pclose failed for '%s': %s", cmd, strerror(errno));
+    else if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+        die("'%s' exited with status %d", cmd, WEXITSTATUS(status));
+    else if (WIFSIGNALED(status))
+        die("'%s' killed by signal %d", cmd, WTERMSIG(status));
 }
 
 

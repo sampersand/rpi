@@ -13,14 +13,15 @@ fi
 
 h DOCTYPE \
 html -a lang=en [ \
-	head [ title -t "Hello, $place!" ] \
+	head [ \
+		title -t "Hello, $place!" \
+	] \
 	body [ \
 		h1 -t "Hello, $place!" \
-		p [ -n \
-			@ -t "The time on the server is currently " \
-			span -x0 -a style=font-style:italic -t "$(date)" \
-			@ -t . \
-			@ -N \
+		p [ -c \
+			-T "The time on the server is currently" \
+			span -a 'style="font-style: italic"' -x date \
+			-iT . \
 		] \
 		p -t "It's a good day today!" \
 	] \
