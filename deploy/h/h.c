@@ -27,7 +27,9 @@ const char *inline_elements[] = {
     "textarea", "time", "u", "var", NULL
 };
 
-bool needs_trailing_whitesapce(const char *str) {
+// Returns whether an html element represented by `str` is a text node, and thus
+// needs spaces when outputting in compact mode
+bool is_text_node(const char *str) {
 	if (str == NULL) return false;
 	for (const char *p = inline_elements[0]; *p; ++p)
 		if (!strcmp(str, p)) return true;
@@ -35,7 +37,6 @@ bool needs_trailing_whitesapce(const char *str) {
 }
 
 // Controlled by the `COMPACT` env var. If set, no extraneous whitespace is printed
-bool compact;
 int inline_mode;
 bool is_very_first_element = true;
 
@@ -47,21 +48,41 @@ char *const *argv;
 #define die(...) do { fprintf(stderr, "%s: ", argv[0]), \
 				  fprintf(stderr, __VA_ARGS__), \
 				  fputc('\n', stderr), \
-				  exit(1); } while (0)
+				  exit(EXIT_FAILURE); } while (0)
 
 // Prints a file to stdout, aborting if there's a problem
+void cat_FILE(FILE *f, bool chomp_last) {
+    char buf[4096];
+    size_t n;
+    int prev = -1;  // last byte of previous chunk, or -1 if none
+
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+        if (prev != -1)
+            fwrite(&(char){prev}, 1, 1, stdout);  // flush held byte
+        prev = (unsigned char)buf[n - 1];
+        fwrite(buf, 1, n - 1, stdout);             // write all but last byte
+    }
+
+    // now prev holds the very last byte
+    if (prev != -1 && !(chomp_last && prev == '\n'))
+        fwrite(&(char){prev}, 1, 1, stdout);
+}
+
 void cat_file(const char *file) {
     FILE *f = fopen(file, "r");
     if (!f)
     	die("cannot cat %s: %s", file, strerror(errno));
-
-    char buf[4096];
-    size_t n;
-    while ((n = fread(buf, 1, sizeof(buf), f)) > 0)
-        fwrite(buf, 1, n, stdout);
-
+    cat_FILE(f, false);
     fclose(f);
 }
+
+void execute_command(const char *cmd) {
+	FILE *p = popen(cmd, "r");
+	if (!p)
+    	die("cannot execute %s: %s", cmd, strerror(errno));
+   	cat_FILE(p, true);
+}
+
 
 /**************************************************************************************************
  *                                         HTML Elements                                          *
@@ -72,24 +93,26 @@ struct element {
 	const char *name;      // The name of the element (eg `h1`, `div`, etc)
 	char *attributes;      // Attributes for the element (`style=`, `href=`, ...). malloc'd.
 	unsigned short indent; // How deeply indented the element is
-	bool no_newline;       // whether a trailing newline should be printed
-	bool previous_needs_whitespace;
+	bool compact;          // Whether we emit the smallest required whitespace
+	bool is_text_node, prev_is_text_node;
 };
 
 // Prints the leading indentation for the element
-void print_indent(struct element *ele) {
+void print_indent(const struct element *ele) {
 	if (inline_mode) {
 		inline_mode = false;
 		return;
 	}
-	if (compact) {
-		if (ele->previous_needs_whitespace)
+
+	if (ele->compact) {
+		if (ele->prev_is_text_node /*&& (ele->name && !(is_text_node(ele->name)))*/)
 			putchar(' ');
 	} else {
 		if (is_very_first_element)
 			is_very_first_element = false;
-		else if (!ele->no_newline)
+		else
 			putchar('\n');
+
 		for (unsigned i = 0; i < ele->indent; ++i)
 			putchar('\t');
 	}
@@ -135,57 +158,97 @@ static bool has_current_element(void) {
 
 // Overwrites the current element with a new one
 void set_current_element(const char *name) {
-	if (current_element.name)
-		current_element.previous_needs_whitespace = needs_trailing_whitesapce(current_element.name);
+	if (current_element.name) {
+		current_element.prev_is_text_node = current_element.is_text_node;
+	}
 
 	current_element.name = name;
 	free(current_element.attributes); // NOTE: this is OK even when `attributes` are null.
 	current_element.attributes = NULL;
+
+	current_element.is_text_node = is_text_node(name);
 }
 
 // Pushes the current stack, adding a new element on top. Used by `[`.
 void push_stack(void) {
-	unsigned short old_indent = current_element.indent;
 	if (element_stack_len++ > ELEMENT_STACK_SIZE) {
 		die("too many nested `[` encountered (%d max)", ELEMENT_STACK_SIZE);
 	}
 
 	set_current_element(NULL);
-	current_element.indent = old_indent + 1;
-	current_element.previous_needs_whitespace = false;
+	current_element.indent = element_stack[element_stack_len - 1].indent + 1;
+	current_element.compact = element_stack[element_stack_len - 1].compact;
+	current_element.prev_is_text_node = false;
 }
 
-// Clears the current element from the top of the stack
-void pop_stack(void) {
+// Clears the current element from the top of the stack. Returns whether the
+// popped element was in "compact mode"
+bool pop_stack(void) {
 	assert(element_stack_len);
 	free(current_element.attributes); // make sure we don't have dangling memory
-	--element_stack_len;
+
+	return element_stack[element_stack_len--].compact;
 }
 
 /**************************************************************************************************
  *                                          Program Loop                                          *
  **************************************************************************************************/
 
+_Noreturn void usage(bool is_error) {
+	FILE *out = is_error ? stderr : stdout;
+
+	fprintf(out,
+		"usage: %s [options | html-elements]\n"
+		"summary: prints out an HTML element,possibly with nested subelements.\n"
+		"         each new non-flag option introduces a new element to the scope.\n"
+		"         children nodes inherit parent node flags, except -I which is incremented.\n"
+		"\n"
+		"options: \n"
+		"   -c, --compact            only print required whitespace (also: $COMPACT)\n"
+		"   -i, --inline             suppress whitespace before this element\n"
+		"   -I, --indent=LEVEL       sets indentation level (relative: +N or -N) (also: $INDENT)\n"
+		"   -a, --attribute=ATTR     add an HTML attribute to the current element\n"
+		"   -A, --clear-attributes   clears all attribute for the current element\n"
+		"   -t, --text=TEXT          inserts <ele>TEXT</ele> (repeatable)\n"
+		"   -T, --inline-text=TEXT   inserts TEXT without an HTML wrapper\n"
+		"   -f, --file=FILE          like -t, but read content from FILE\n"
+		"   -F, --inline-file=TEXT   like -T, but read content from FILE\n"
+		"   -x, --execute=CMD        like -t, but executes CMD\n"
+		"   -X, --inline-execute=CMD like -T, but executes CMD\n"
+		"\n"
+		"nested elements use square brackets: div [ strong -t hello ]\n"
+		"\n"
+		"note: in compact mode, whitespace is still inserted before inline elements\n"
+		"      (strong, span, a, etc.) unless -i is given.\n",
+	argv[0]);
+
+	exit(is_error ? EXIT_FAILURE : EXIT_SUCCESS);
+}
+
 int getopt_possibly_long(void) {
+	#define GETOPT_STRING "ht:T:f:F:a:AcCiI:x:"
 #ifdef HAS_GETOPT_LONG
 	// TODO
 	static struct option longopts[] = {
+	    { "help",           no_argument,        NULL,   'h' },
 	    { "text",           required_argument,  NULL,   't' },
 	    { "inline-text",    required_argument,  NULL,   'T' },
 	    { "attribute",      required_argument,  NULL,   'a' },
 	    { "clear-attribute",no_argument,        NULL,   'A' },
-	    { "no-newline",     no_argument,        NULL,   'n' },
-	    { "newline",        no_argument,        NULL,   'N' },
-	    { "indent",         required_argument,  NULL,   'x' },
+	    { "compact",        no_argument,        NULL,   'c' },
+	    { "no-compact",     no_argument,        NULL,   'C' },
+	    { "indent",         required_argument,  NULL,   'I' },
+	    { "execute",        required_argument,  NULL,   'x' },
+	    { "inline=execute", required_argument,  NULL,   'X' },
 	    { "include-file",   required_argument,  NULL,   'f' },
 	    { "inline-file",    required_argument,  NULL,   'F' },
 	    { "inline",         no_argument,        NULL,   'i' },
 	    { NULL,             0,                  NULL,    0  },
 	};
 
-	return getopt_long(argc, argv, "+t:T:a:AnNix:f:F:", longopts, NULL);
+	return getopt_long(argc, argv, "+" GETOPT_STRING, longopts, NULL);
 #else
-	return getopt(argc, argv, "t:T:a:AnNix:f:F:");
+	return getopt(argc, argv, GETOPT_STRING);
 #endif
 }
 
@@ -199,13 +262,9 @@ enum status run_program(void) {
 	bool was_printed = false;
 	char *nonflag_arg;
 	enum status status = NO_MORE_OPTIONS;
-	// int inline_mode = 0;
 
 	// Loop while there's still stuff left to be read.
-	while ( 1 ) {
-		inline_mode = false;
-	top:
-		if (!(optind < argc)) break;
+	while ( optind < argc ) {
 		// Fetch the current option.
 		//
 		// We have a Frankenstein-esque approach to using `getopt` here, where instead of just
@@ -240,11 +299,11 @@ enum status run_program(void) {
 
 				push_stack();
 				enum status child_status = run_program();
-				pop_stack();
+				enum indent indent = pop_stack() ? NO_INDENT : INDENT;
 
 				if (child_status != END_NESTED_ELEMENT)
 					die("missing closing ] for %s", current_element.name);
-				print_current_element(CLOSING_ELE, INDENT);
+				print_current_element(CLOSING_ELE, indent);
 				was_printed = true;
 				break;
 			}
@@ -277,20 +336,23 @@ enum status run_program(void) {
 			was_printed = false;
 			break;
 
+		case 'h':
+			usage(false);
+
 		case 'i':
 			inline_mode = true;
-			goto top;
-
-		case 'n':
-			current_element.no_newline = true;
 			break;
 
-		case 'N':
-			current_element.no_newline = false;
+		case 'c':
+			current_element.compact = true;
 			break;
 
-		case 'x':
-			// You can specify `-x +10` to increment by 10, or `-x +` to just increase 1
+		case 'C':
+			current_element.compact = false;
+			break;
+
+		case 'I':
+			// You can specify `-I +10` to increment by 10, or `-I +` to just increase 1
 			switch (optarg[0]) {
 			case '+':
 				current_element.indent += optarg[1] ? atoi(optarg + 1) : 1;
@@ -320,25 +382,26 @@ enum status run_program(void) {
 			}
 			break;
 
+		case 'X':
 		case 'F':
 		case 'T':
 			print_indent(&current_element);
-			current_element.previous_needs_whitespace = true;
-			if (opt == 'F') cat_file(optarg);
+			current_element.prev_is_text_node = true;
+			if (opt == 'X') fflush(stdout), system(optarg);
+			else if (opt == 'F') cat_file(optarg);
 			else fputs(optarg, stdout);
 			break;
 
+		case 'x':
 		case 'f':
 		case 't':
 			if (!has_current_element())
 				die("cannot print embedded text when there is no active element; try -T instead?");
 
 			print_current_element(OPENING_ELE, INDENT);
-			if (opt == 'f') {
-				cat_file(optarg);
-			} else {
-				fputs(optarg, stdout);
-			}
+			if (opt == 'x') execute_command(optarg);
+			else if (opt == 'f') cat_file(optarg);
+			else fputs(optarg, stdout);
 
 			// TODO: should we have no indent? thats what the shell one did
 			print_current_element(CLOSING_ELE, NO_INDENT);
@@ -346,7 +409,7 @@ enum status run_program(void) {
 			break;
 
         case '?':
-        	exit(1);
+        	exit(EXIT_FAILURE);
 
 		default:
 			die("bug, unknown option %d", opt);
@@ -367,22 +430,15 @@ int main(int argc_, char *const argv_[]) {
 	argv = argv_;
 
 	// Initial environment variable setup
-	compact = getenv("COMPACT") != NULL;
+	current_element.compact = getenv("COMPACT") != NULL;
 	char *indent = getenv("INDENT");
 	current_element.indent = indent ? atoi(indent) : 0;
 
-	// char * const other_argv[] = { argv[0], "-n", "div", "-t", "foobar", "br", "-Tbaz", "quux", 0 };
-	// char * const other_argv[] = { argv[0], "p", "-ax", "-ay", "-ta", "-tb", 0 };
-	// char * const other_argv[] = { argv[0], "div", "[]", "p", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
-	char * const other_argv[] = { argv[0], "-Ta", "-Tb", "-iTc", 0 }; //, "-n", "p", "-tfoo", "-N", "]", 0 };
-	if (argc == 1) {
-		compact=1;
-		argc = sizeof(other_argv) / sizeof(char*) - 1; // / sizeof(char *);
-		argv = other_argv;
-	}
+	if (argc == 1)
+		usage(true);
 
 	if (run_program() == END_NESTED_ELEMENT)
 		die("stray ] encountered");
 
-	if (! compact) putchar('\n');
+	if (!current_element.compact) putchar('\n');
 }
