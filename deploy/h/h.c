@@ -20,6 +20,9 @@
  *                             Global Variables and Helper Functions                              *
  **************************************************************************************************/
 
+bool inline_mode; // If set, the very next element has no whitespace printed
+bool is_very_first_element = true; // Used to not print padding beforethe first element
+
 // Returns whether an html element represented by `str` is a text node, and thus
 // needs spaces when outputting in compact mode
 bool is_text_node(const char *str) {
@@ -39,10 +42,6 @@ bool is_text_node(const char *str) {
 
 	return false;
 }
-
-// Controlled by the `COMPACT` env var. If set, no extraneous whitespace is printed
-int inline_mode;
-bool is_very_first_element = true;
 
 // The `argc` and `argv` from `main()` (set here so others can use them)
 int argc;
@@ -108,6 +107,15 @@ struct element {
 	bool is_text_node, prev_is_text_node;
 };
 
+// The element stack. This is used when nesting elements via `[ ... ]`, eg `div [ span [ ... ] ]`
+#ifndef ELEMENT_STACK_SIZE
+# define ELEMENT_STACK_SIZE 10000
+#endif
+struct element element_stack[ELEMENT_STACK_SIZE];
+unsigned element_stack_len = 0;
+#define current_element (element_stack[element_stack_len])
+
+
 // Prints the leading indentation for the element
 void print_indent(const struct element *ele) {
 	if (inline_mode) {
@@ -116,7 +124,7 @@ void print_indent(const struct element *ele) {
 	}
 
 	if (ele->compact) {
-		if (ele->prev_is_text_node /*&& (ele->name && !(is_text_node(ele->name)))*/)
+		if (ele->prev_is_text_node)
 			putchar(' ');
 	} else {
 		if (is_very_first_element)
@@ -129,19 +137,21 @@ void print_indent(const struct element *ele) {
 	}
 }
 
-enum closing { OPENING_ELE, CLOSING_ELE };
 enum indent { NO_INDENT, INDENT };
 #define print_current_element(...) print_element(&current_element, __VA_ARGS__)
-void print_element(struct element *ele, enum closing closing, enum indent indent) {
+
+void print_closing_element(const struct element *ele, enum indent indent) {
+	assert(ele->name);
+	if (indent == INDENT) print_indent(ele);
+	printf("</%s>", ele->name);
+}
+
+void print_element(const struct element *ele, enum indent indent) {
 	assert(ele->name);
 	if (indent == INDENT)
 		print_indent(ele);
 
-	if (!strcmp(ele->name, "@")) return; // TODO: is this still useful?
-
-	if (closing == CLOSING_ELE) {
-		printf("</%s>", ele->name);
-	} else if (!strcmp(ele->name, "DOCTYPE")) {
+	if (!strcmp(ele->name, "DOCTYPE")) {
 		system("header Content-Type text/html"); // TODO: abort if this fails
 		fputs("<!DOCTYPE html>", stdout);
 	} else {
@@ -154,14 +164,6 @@ void print_element(struct element *ele, enum closing closing, enum indent indent
 /**************************************************************************************************
  *                                       The Element Stack                                        *
  **************************************************************************************************/
-
-// The element stack. This is used when nesting elements via `[ ... ]`, eg `div [ span [ ... ] ]`
-#ifndef ELEMENT_STACK_SIZE
-# define ELEMENT_STACK_SIZE 10000
-#endif
-struct element element_stack[ELEMENT_STACK_SIZE];
-unsigned element_stack_len = 0;
-#define current_element (element_stack[element_stack_len])
 
 static bool has_current_element(void) {
 	return current_element.name != NULL;
@@ -306,7 +308,7 @@ enum status run_program(void) {
 			if (!strcmp(nonflag_arg, "[")) {
 				if (!has_current_element())
 					die("cannot nest when there's no active element");
-				print_current_element(OPENING_ELE, INDENT);
+				print_current_element(INDENT);
 
 				push_stack();
 				enum status child_status = run_program();
@@ -314,7 +316,7 @@ enum status run_program(void) {
 
 				if (child_status != END_NESTED_ELEMENT)
 					die("missing closing ] for %s", current_element.name);
-				print_current_element(CLOSING_ELE, indent);
+				print_closing_element(&current_element, indent);
 				was_printed = true;
 				break;
 			}
@@ -329,8 +331,8 @@ enum status run_program(void) {
 			if (!strcmp(nonflag_arg, "[]")) {
 				if (!has_current_element())
 					die("cannot nest when there's no active element");
-				print_current_element(OPENING_ELE, INDENT);
-				print_current_element(CLOSING_ELE, INDENT);
+				print_current_element(INDENT);
+				print_closing_element(&current_element, INDENT);
 				was_printed = true;
 				break;
 			}
@@ -340,7 +342,7 @@ enum status run_program(void) {
 			 ******************************************************************/
 
 			if (has_current_element() && !was_printed) {
-				print_current_element(OPENING_ELE, INDENT);
+				print_current_element(INDENT);
 			}
 
 			set_current_element(nonflag_arg);
@@ -409,13 +411,13 @@ enum status run_program(void) {
 			if (!has_current_element())
 				die("cannot print embedded text when there is no active element; try -T instead?");
 
-			print_current_element(OPENING_ELE, INDENT);
+			print_current_element(INDENT);
 			if (opt == 'x') execute_command(optarg);
 			else if (opt == 'f') cat_file(optarg);
 			else fputs(optarg, stdout);
 
 			// TODO: should we have no indent? thats what the shell one did
-			print_current_element(CLOSING_ELE, NO_INDENT);
+			print_closing_element(&current_element, NO_INDENT);
 			current_element.prev_is_text_node = current_element.is_text_node;
 			was_printed = true;
 			break;
@@ -431,7 +433,7 @@ enum status run_program(void) {
 done:
 
 	if ( has_current_element() && ! was_printed ) {
-		print_current_element(OPENING_ELE, INDENT);
+		print_current_element(INDENT);
 	}
 
 	return status;

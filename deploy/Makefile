@@ -9,9 +9,9 @@ INSTALL_SYSTEM_DEP     = sudo apt-get install -y --
 R49_RUBYLIB_DST_LOCATION = /usr/local/lib/ruby
 R49_RUBYLIB_SRC_LOCATION = ~/shared-files/r49-include
 
-.PHONY: r49 sampshell p
+.PHONY: r49 sampshell p h
 
-install: r49 sampshell p knight
+install: r49 sampshell p h knight
 
 sampshell: $(SAMPSHELL_LOCATION)
 $(SAMPSHELL_LOCATION): | git
