@@ -20,19 +20,23 @@
  *                             Global Variables and Helper Functions                              *
  **************************************************************************************************/
 
-const char *inline_elements[] = {
-    "a", "abbr", "acronym", "b", "bdi", "bdo", "big", "button",
-    "cite", "code", "em", "i", "kbd", "label", "mark", "q",
-    "s", "samp", "select", "small", "span", "strong", "sub", "sup",
-    "textarea", "time", "u", "var", NULL
-};
-
 // Returns whether an html element represented by `str` is a text node, and thus
 // needs spaces when outputting in compact mode
 bool is_text_node(const char *str) {
-	if (str == NULL) return false;
-	for (const char *p = inline_elements[0]; *p; ++p)
-		if (!strcmp(str, p)) return true;
+	static const char *inline_elements[] = {
+		"a", "abbr", "acronym", "b", "bdi", "bdo", "big", "button",
+		"cite", "code", "em", "i", "kbd", "label", "mark", "q",
+		"s", "samp", "select", "small", "span", "strong", "sub", "sup",
+		"textarea", "time", "u", "var"
+	};
+
+	if (str == NULL)
+		return false;
+
+	for (unsigned i = 0; i < sizeof(inline_elements) / sizeof(inline_elements[0]); ++i)
+		if (!strcmp(str, inline_elements[i]))
+			return true;
+
 	return false;
 }
 
@@ -412,6 +416,7 @@ enum status run_program(void) {
 
 			// TODO: should we have no indent? thats what the shell one did
 			print_current_element(CLOSING_ELE, NO_INDENT);
+			current_element.prev_is_text_node = current_element.is_text_node;
 			was_printed = true;
 			break;
 
