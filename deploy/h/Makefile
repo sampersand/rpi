@@ -1,4 +1,4 @@
-CFLAGS = -Wall -Wextra -Wpedantic -g -fsanitize=address,undefined
+CFLAGS = -Wall -Wextra -Wpedantic -O3 -DNDEBUG #// -g -fsanitize=address,undefined
 EXE = h
 
 .PHONY: install clean test
