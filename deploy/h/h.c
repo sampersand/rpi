@@ -21,7 +21,7 @@
  **************************************************************************************************/
 
 bool inline_mode; // If set, the very next element has no whitespace printed
-bool is_very_first_element = true; // Used to not print padding beforethe first element
+bool is_very_first_element = true; // Used to not print padding before the first element
 
 // Returns whether an html element represented by `str` is a text node, and thus
 // needs spaces when outputting in compact mode
@@ -72,8 +72,7 @@ void cat_FILE(FILE *f, bool chomp_last) {
 
 void cat_file(const char *file) {
     FILE *f = fopen(file, "r");
-    if (!f)
-    	die("cannot cat %s: %s", file, strerror(errno));
+    if (!f) die("cannot cat %s: %s", file, strerror(errno));
     cat_FILE(f, false);
     fclose(f);
 }
@@ -184,9 +183,8 @@ void set_current_element(const char *name) {
 
 // Pushes the current stack, adding a new element on top. Used by `[`.
 void push_stack(void) {
-	if (element_stack_len++ > ELEMENT_STACK_SIZE) {
+	if (element_stack_len++ > ELEMENT_STACK_SIZE)
 		die("too many nested `[` encountered (%d max)", ELEMENT_STACK_SIZE);
-	}
 
 	set_current_element(NULL);
 	current_element.indent = element_stack[element_stack_len - 1].indent + 1;
@@ -208,9 +206,7 @@ bool pop_stack(void) {
  **************************************************************************************************/
 
 _Noreturn void usage(bool is_error) {
-	FILE *out = is_error ? stderr : stdout;
-
-	fprintf(out,
+	fprintf(is_error ? stderr : stdout,
 		"usage: %s [options | html-elements]\n"
 		"summary: prints out an HTML element,possibly with nested subelements.\n"
 		"         each new non-flag option introduces a new element to the scope.\n"
@@ -341,9 +337,8 @@ enum status run_program(void) {
 			 *                        Normal HTML Tags                        *
 			 ******************************************************************/
 
-			if (has_current_element() && !was_printed) {
+			if (has_current_element() && !was_printed)
 				print_current_element(INDENT);
-			}
 
 			set_current_element(nonflag_arg);
 			was_printed = false;
